@@ -1,4 +1,4 @@
-export type VaultKind = 'opfs' | 'local';
+export type VaultKind = 'server' | 'opfs' | 'local';
 
 export interface VaultEntry {
   path: string;

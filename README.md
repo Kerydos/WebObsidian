@@ -1,8 +1,10 @@
 # WebObsidian
 
-브라우저에서 동작하는 로컬 퍼스트 Markdown 지식 관리 MVP입니다. 현재 구현은 다음 사용자 흐름을 지원합니다.
+서버 폴더에 Markdown 파일을 저장하는 셀프 호스팅 지식 관리 MVP입니다. 현재 구현은 다음 사용자 흐름을 지원합니다.
 
-- OPFS 기반 Browser Vault 생성과 오프라인 저장
+- 서버 파일시스템 기반 Server Vault 생성과 자동 저장
+- 단일 관리자 로그인과 서버 세션 보호
+- OPFS 기반 Browser Vault 저장소 구현
 - Chromium 계열 브라우저에서 로컬 Markdown 폴더 열기
 - CodeMirror 6 편집과 자동 저장
 - 위키링크, 태그, 백링크 인덱싱
@@ -15,8 +17,16 @@ Node.js 22.12 이상에서 실행합니다.
 
 ```bash
 npm install
+WEBOBSIDIAN_PASSWORD='12자 이상의 비밀번호' npm run server:dev
+```
+
+다른 터미널에서 프런트엔드를 실행합니다.
+
+```bash
 npm run dev
 ```
+
+기본 서버 볼트는 프로젝트의 `vault/` 폴더이며 `WEBOBSIDIAN_VAULT_DIR` 환경 변수로 변경할 수 있습니다.
 
 검증 명령은 다음과 같습니다.
 
@@ -25,7 +35,47 @@ npm test
 npm run build
 ```
 
-CRDT 동기화, 셀프 호스팅 서버, Git 백업, Canvas 편집은 MVP 범위에 포함하지 않습니다.
+CRDT 동기화, Git 백업, Canvas 편집은 MVP 범위에 포함하지 않습니다.
+
+## 모델 B 운영 배포
+
+프로덕션 빌드와 파일 API는 하나의 Node.js 프로세스로 실행됩니다.
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production \
+WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호' \
+WEBOBSIDIAN_VAULT_DIR=/srv/webobsidian/vault \
+HOST=127.0.0.1 PORT=3000 npm start
+```
+
+서버 프로세스가 해당 볼트 폴더를 읽고 쓸 수 있어야 합니다. Nginx 또는 Caddy에서 `127.0.0.1:3000`으로 리버스 프록시하고 HTTPS를 적용하세요.
+
+Docker Compose를 사용하면 저장 파일은 호스트의 `./vault` 폴더에 남습니다.
+
+```bash
+mkdir -p vault
+export WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호'
+docker compose up -d --build
+```
+
+서비스는 보안을 위해 호스트의 `127.0.0.1:3000`에만 바인딩됩니다. 외부 접속은 HTTPS 리버스 프록시를 통해 제공해야 합니다.
+
+로그인은 단일 관리자 비밀번호 방식입니다. 비밀번호는 서버 환경 변수로만 전달되고 브라우저에는 HttpOnly 세션 쿠키만 저장됩니다. 세션은 7일 후 또는 서버가 재시작될 때 만료되며, 동일 클라이언트에서 15분 동안 5회 실패하면 추가 로그인이 일시적으로 차단됩니다.
+
+### 환경 변수
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `WEBOBSIDIAN_PASSWORD` | 없음, 필수 | 12자 이상의 관리자 비밀번호 |
+| `WEBOBSIDIAN_SECURE_COOKIE` | 운영 모드에서 `true` | HTTPS 전용 세션 쿠키 사용 여부 |
+| `WEBOBSIDIAN_VAULT_DIR` | 프로젝트의 `vault/` | Markdown 파일 저장 폴더 |
+| `WEBOBSIDIAN_DIST_DIR` | 프로젝트의 `dist/` | 빌드된 정적 파일 폴더 |
+| `HOST` | `127.0.0.1` | 서버 바인딩 주소 |
+| `PORT` | `3000` | 서버 포트 |
+
+서버는 `.md` 파일만 취급하며 하위 폴더를 지원합니다. 저장할 때 임시 파일을 같은 폴더에 쓴 다음 원본 경로로 교체하고, 클라이언트가 읽은 뒤 서버 파일이 외부에서 변경되었으면 `409 Conflict`로 덮어쓰기를 막습니다.
 
 ---
 

@@ -1,0 +1,10 @@
+services:
+  webobsidian:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      WEBOBSIDIAN_PASSWORD: ${WEBOBSIDIAN_PASSWORD:?WEBOBSIDIAN_PASSWORD를 설정하세요}
+    volumes:
+      - ./vault:/data/vault

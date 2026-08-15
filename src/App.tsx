@@ -10,16 +10,18 @@ import {
   HardDrive,
   Link2,
   LoaderCircle,
+  LogOut,
   Search,
   Sparkles,
 } from 'lucide-react';
 import type { VaultDocument, VaultEntry, VaultRepository } from './types/vault';
-import { OpfsVaultRepository } from './lib/vault/opfs';
+import { ServerVaultRepository } from './lib/vault/server';
 import { LocalFsVaultRepository } from './lib/vault/localFs';
 import { ensureMarkdownPath } from './lib/vault/path';
 import { backlinksFor, indexMarkdown, resolveLink, type NoteIndex } from './lib/markdown/indexer';
 import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
+import { LoginScreen } from './components/LoginScreen';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 
@@ -27,7 +29,7 @@ type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 
 const welcomeNote = `# WebObsidian에 오신 것을 환영합니다
 
-이 볼트는 브라우저의 개인 파일 시스템에 저장됩니다. 네트워크가 끊겨도 편집할 수 있습니다.
+노트는 현재 선택한 볼트 저장소에 Markdown 파일로 저장됩니다.
 
 ## 시작하기
 
@@ -44,8 +46,42 @@ function messageOf(error: unknown) {
   return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 }
 
+type AuthStatus = 'checking' | 'authenticated' | 'anonymous';
+
 export function App() {
-  const [repository, setRepository] = useState<VaultRepository>(() => new OpfsVaultRepository());
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [authError, setAuthError] = useState<string>();
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('서버에 연결할 수 없습니다.');
+        const body = await response.json() as { authenticated: boolean };
+        setAuthStatus(body.authenticated ? 'authenticated' : 'anonymous');
+      })
+      .catch(() => {
+        setAuthError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+        setAuthStatus('anonymous');
+      });
+    const unauthorized = () => setAuthStatus('anonymous');
+    window.addEventListener('webobsidian:unauthorized', unauthorized);
+    return () => window.removeEventListener('webobsidian:unauthorized', unauthorized);
+  }, []);
+
+  if (authStatus === 'checking') {
+    return <div className="login-shell"><LoaderCircle className="spin" /></div>;
+  }
+  if (authStatus === 'anonymous') {
+    return <LoginScreen initialError={authError} onAuthenticated={() => {
+      setAuthError(undefined);
+      setAuthStatus('authenticated');
+    }} />;
+  }
+  return <WorkspaceApp onLoggedOut={() => setAuthStatus('anonymous')} />;
+}
+
+function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const [repository, setRepository] = useState<VaultRepository>(() => new ServerVaultRepository());
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [documents, setDocuments] = useState<Map<string, VaultDocument>>(() => new Map());
   const [activePath, setActivePath] = useState<string>();
@@ -233,6 +269,15 @@ export function App() {
     else setError(`연결된 노트를 찾을 수 없습니다: ${target}`);
   };
 
+  const logout = async () => {
+    await saveActive();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      onLoggedOut();
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -241,11 +286,14 @@ export function App() {
           <strong>WebObsidian</strong>
           <span className="vault-pill"><HardDrive size={13} /> {repository.name}</span>
         </div>
-        <div className="save-status" data-state={saveState}>
-          {saveState === 'saving' ? <LoaderCircle size={14} className="spin" /> : null}
-          {saveState === 'saved' ? <Check size={14} /> : null}
-          {saveState === 'error' ? <CircleAlert size={14} /> : null}
-          {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
+        <div className="topbar-actions">
+          <div className="save-status" data-state={saveState}>
+            {saveState === 'saving' ? <LoaderCircle size={14} className="spin" /> : null}
+            {saveState === 'saved' ? <Check size={14} /> : null}
+            {saveState === 'error' ? <CircleAlert size={14} /> : null}
+            {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
+          </div>
+          <button className="logout-button" onClick={() => void logout()} title="로그아웃"><LogOut size={15} /> 로그아웃</button>
         </div>
       </header>
 
@@ -275,7 +323,7 @@ export function App() {
         </nav>
         <div className="storage-note">
           <span className="status-dot" />
-          {repository.kind === 'opfs' ? '브라우저에 로컬 저장' : '로컬 폴더에 직접 저장'}
+          {repository.kind === 'server' ? '서버 폴더에 저장' : repository.kind === 'opfs' ? '브라우저에 로컬 저장' : '로컬 폴더에 직접 저장'}
         </div>
       </aside>
 
