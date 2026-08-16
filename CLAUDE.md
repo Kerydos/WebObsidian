@@ -9,6 +9,9 @@
 - 해당 커밋은 원격 브랜치에 푸시되어 있다.
 - 인플레이스 마크다운 라이브 프리뷰 변경은 현재 작업 트리에 있으며 아직 커밋되지 않았다.
 - `LIVE_PREVIEW_IMPLEMENTATION.md`는 사용자가 제공한 구현 참고 문서이므로 임의로 삭제하거나 덮어쓰지 않는다.
+- 이 서버(KERYON, `/home/jarvis/Workspace/WebObsidian`)에 Docker Compose로 배포되어 `https://writer.kerydos.com`에서 서비스 중이다. 컨테이너는 `webobsidian` 이름으로 기존 `gototop-net` 공유 네트워크에 연결되며, 리버스 프록시와 TLS는 `/home/jarvis/Workspace/Caddy/Caddyfile`의 Caddy 컨테이너가 처리한다. DNS(`writer.kerydos.com` A 레코드)는 Cloudflare에서 관리하며 `/home/jarvis/Workspace/Caddy/cloudflare-ddns/`의 DDNS 스크립트가 다른 kerydos.com 서브도메인과 함께 갱신한다.
+- 운영 비밀번호는 `WebObsidian/.env`(git 미포함)의 `WEBOBSIDIAN_PASSWORD`에 있다. 값은 이 문서에 기록하지 않는다.
+- 참고: 이 환경의 Bash 도구는 프로젝트 작업 디렉터리 밖의 파일(예: `/home/jarvis/Workspace/Caddy`)에 대해 실제 호스트와 다른 캐시 뷰를 보일 수 있었다. 그런 파일을 수정한 뒤에는 관련 컨테이너를 재시작해 반영 여부를 반드시 확인할 것.
 
 ## 아키텍처
 
