@@ -16,6 +16,7 @@ import {
   Search,
   Settings2,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from './types/vault';
 import { ServerVaultRepository } from './lib/vault/server';
@@ -26,6 +27,7 @@ import { backlinksFor, indexMarkdown, resolveLink, type NoteIndex } from './lib/
 import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
 import { LoginScreen } from './components/LoginScreen';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { AppearanceSettingsPanel } from './components/AppearanceSettings';
 import { APPEARANCE_STORAGE_KEY, appearanceVariables, parseAppearance } from './lib/settings/appearance';
 
@@ -51,6 +53,21 @@ function messageOf(error: unknown) {
   if (error instanceof DOMException && error.name === 'AbortError') return '폴더 선택을 취소했습니다.';
   return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 }
+
+function uniqueBaseName(taken: Set<string>, base: string, suffix: string) {
+  if (!taken.has(`${base}${suffix}`)) return base;
+  for (let index = 2; ; index += 1) {
+    const candidate = `${base} ${index}`;
+    if (!taken.has(`${candidate}${suffix}`)) return candidate;
+  }
+}
+
+function parentOf(path: string) {
+  const separator = path.lastIndexOf('/');
+  return separator === -1 ? '' : path.slice(0, separator);
+}
+
+type RenameTarget = { kind: 'note'; path: string } | { kind: 'folder'; path: string };
 
 type AuthStatus = 'checking' | 'authenticated' | 'anonymous';
 
@@ -98,6 +115,11 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [renaming, setRenaming] = useState<RenameTarget | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const cancelRenameRef = useRef(false);
   const [appearance, setAppearance] = useState(() => {
     try {
       return parseAppearance(window.localStorage.getItem(APPEARANCE_STORAGE_KEY));
@@ -142,8 +164,11 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const activeNote = notes.find((note) => note.path === activePath);
   const backlinks = activePath ? backlinksFor(activePath, notes) : [];
 
-  const loadRepository = useCallback(async (nextRepository: VaultRepository) => {
-    setLoading(true);
+  const loadRepository = useCallback(async (
+    nextRepository: VaultRepository,
+    options: { preferredActivePath?: string; silent?: boolean } = {},
+  ) => {
+    if (!options.silent) setLoading(true);
     setError(undefined);
     try {
       let nextEntries = await nextRepository.list();
@@ -169,14 +194,16 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       setEntries(nextEntries);
       setFolders(nextFolders);
       setDocuments(nextDocuments);
-      const firstPath = nextEntries[0]?.path;
-      setActivePath(firstPath);
-      setEditorValue(firstPath ? nextDocuments.get(firstPath)?.content ?? '' : '');
+      const activePathCandidate = options.preferredActivePath && nextDocuments.has(options.preferredActivePath)
+        ? options.preferredActivePath
+        : nextEntries[0]?.path;
+      setActivePath(activePathCandidate);
+      setEditorValue(activePathCandidate ? nextDocuments.get(activePathCandidate)?.content ?? '' : '');
       setSaveState('saved');
     } catch (cause) {
       setError(messageOf(cause));
     } finally {
-      setLoading(false);
+      if (!options.silent) setLoading(false);
     }
   }, []);
 
@@ -270,32 +297,154 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     }
   };
 
+  const startRenameNote = (path: string) => {
+    setRenaming({ kind: 'note', path });
+    setRenameValue(path.split('/').at(-1)?.replace(/\.md$/i, '') ?? path);
+  };
+
+  const startRenameFolder = (path: string) => {
+    setRenaming({ kind: 'folder', path });
+    setRenameValue(path.split('/').at(-1) ?? path);
+  };
+
   const createNote = async () => {
-    const requested = window.prompt('새 노트 이름을 입력하세요.');
-    if (!requested) return;
     try {
       await saveActive();
-      const path = ensureMarkdownPath(requested);
-      if (documentsRef.current.has(path)) throw new Error('같은 경로의 노트가 이미 있습니다.');
-      const created = await repository.create(path, `# ${requested.replace(/\.md$/i, '')}\n\n`);
+      const base = uniqueBaseName(new Set(entries.map((entry) => entry.path)), '무제', '.md');
+      const path = `${base}.md`;
+      const created = await repository.create(path, `# ${base}\n\n`);
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
       setActivePath(path);
       setEditorValue(created.content);
       setSaveState('saved');
+      startRenameNote(path);
     } catch (cause) {
       setError(messageOf(cause));
     }
   };
 
   const createFolder = async () => {
-    const requested = window.prompt('새 폴더 이름을 입력하세요.');
-    if (!requested) return;
     try {
-      const path = normalizeVaultPath(requested);
-      if (folders.some((folder) => folder.path === path)) throw new Error('같은 이름의 폴더가 이미 있습니다.');
-      const created = await repository.createFolder(path);
+      const base = uniqueBaseName(new Set(folders.map((folder) => folder.path)), '새폴더', '');
+      const created = await repository.createFolder(base);
       setFolders((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
+      startRenameFolder(created.path);
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
+  const moveNote = async (path: string, newPath: string) => {
+    if (newPath === path) return;
+    try {
+      if (entries.some((entry) => entry.path === newPath)) throw new Error('같은 이름의 노트가 이미 있습니다.');
+      if (activePathRef.current === path) await saveActive();
+      const moved = await repository.rename(path, newPath);
+      setEntries((previous) => previous.map((entry) => (entry.path === path ? moved : entry)).sort((a, b) => a.path.localeCompare(b.path)));
+      setDocuments((previous) => {
+        const next = new Map(previous);
+        next.delete(path);
+        next.set(newPath, moved);
+        return next;
+      });
+      await db.transaction('rw', db.notes, async () => {
+        await db.notes.delete([repository.name, path]);
+        await db.notes.put({ vault: repository.name, path: newPath, modifiedAt: moved.modifiedAt, content: moved.content });
+      });
+      if (activePathRef.current === path) {
+        setActivePath(newPath);
+        setEditorValue(moved.content);
+      }
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
+  const renameFolderEntry = async (path: string, newPath: string) => {
+    if (newPath === path) return;
+    try {
+      if (folders.some((folder) => folder.path === newPath)) throw new Error('같은 이름의 폴더가 이미 있습니다.');
+      await saveActive();
+      await repository.renameFolder(path, newPath);
+      const current = activePathRef.current;
+      const prefix = `${path}/`;
+      const preferredActivePath = current?.startsWith(prefix) ? `${newPath}${current.slice(path.length)}` : current;
+      await loadRepository(repository, { preferredActivePath, silent: true });
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
+  const commitRename = async () => {
+    const target = renaming;
+    const value = renameValue;
+    setRenaming(null);
+    if (!target) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const parent = parentOf(target.path);
+    if (target.kind === 'note') {
+      const newPath = ensureMarkdownPath(parent ? `${parent}/${trimmed}` : trimmed);
+      await moveNote(target.path, newPath);
+    } else {
+      const newPath = normalizeVaultPath(parent ? `${parent}/${trimmed}` : trimmed);
+      await renameFolderEntry(target.path, newPath);
+    }
+  };
+
+  const handleRenameBlur = () => {
+    const cancelled = cancelRenameRef.current;
+    cancelRenameRef.current = false;
+    if (cancelled) {
+      setRenaming(null);
+      return;
+    }
+    void commitRename();
+  };
+
+  const handleRenameKeyDown = (event: { key: string; currentTarget: HTMLInputElement }) => {
+    if (event.key === 'Enter') event.currentTarget.blur();
+    if (event.key === 'Escape') {
+      cancelRenameRef.current = true;
+      event.currentTarget.blur();
+    }
+  };
+
+  const moveIntoFolder = async (draggedPath: string, folderPath: string) => {
+    const name = draggedPath.split('/').at(-1);
+    if (!name) return;
+    await moveNote(draggedPath, `${folderPath}/${name}`);
+  };
+
+  const moveToRoot = async (draggedPath: string) => {
+    const name = draggedPath.split('/').at(-1);
+    if (!name || parentOf(draggedPath) === '') return;
+    await moveNote(draggedPath, name);
+  };
+
+  const requestDeleteNote = (path: string) => setDeleteTarget(path);
+
+  const confirmDeleteNote = async () => {
+    const path = deleteTarget;
+    setDeleteTarget(null);
+    if (!path) return;
+    try {
+      await repository.remove(path);
+      setEntries((previous) => previous.filter((entry) => entry.path !== path));
+      setDocuments((previous) => {
+        const next = new Map(previous);
+        next.delete(path);
+        return next;
+      });
+      await db.notes.delete([repository.name, path]);
+      if (activePathRef.current === path) {
+        const remaining = entries.filter((entry) => entry.path !== path);
+        const nextPath = remaining[0]?.path;
+        setActivePath(nextPath);
+        setEditorValue(nextPath ? documentsRef.current.get(nextPath)?.content ?? '' : '');
+        setSaveState('saved');
+      }
     } catch (cause) {
       setError(messageOf(cause));
     }
@@ -349,39 +498,132 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="노트 검색" />
           <kbd>⌘K</kbd>
         </label>
-        <div className="section-label">{query ? '검색 결과' : 'NOTES'} <span>{query ? searchResults.length : entries.length}</span></div>
+        <div
+          className={dragOverTarget === '' ? 'section-label drop-target' : 'section-label'}
+          onDragOver={query ? undefined : (event) => { event.preventDefault(); setDragOverTarget(''); }}
+          onDragLeave={query ? undefined : () => setDragOverTarget((current) => (current === '' ? null : current))}
+          onDrop={query ? undefined : (event) => {
+            event.preventDefault();
+            setDragOverTarget(null);
+            const draggedPath = event.dataTransfer.getData('text/webobsidian-path');
+            if (draggedPath) void moveToRoot(draggedPath);
+          }}
+        >
+          {query ? '검색 결과' : 'NOTES'} <span>{query ? searchResults.length : entries.length}</span>
+        </div>
         <nav className="note-list" aria-label="노트 목록">
           {query
             ? searchResults.map((entry) => (
-                <button
-                  key={entry.path}
-                  className={entry.path === activePath ? 'note-item active' : 'note-item'}
-                  onClick={() => void selectNote(entry.path)}
-                >
-                  <BookOpen size={15} />
-                  <span>{entry.title}</span>
-                  <ChevronRight size={14} />
-                </button>
-              ))
-            : buildVaultTree(entries, folders).map((row) =>
-                row.kind === 'folder' ? (
-                  <div key={`folder:${row.path}`} className="folder-item" style={{ paddingLeft: 9 + row.depth * 14 }}>
-                    <Folder size={14} />
-                    <span>{row.name}</span>
-                  </div>
-                ) : (
+                <div key={entry.path} className="note-row">
                   <button
-                    key={row.entry.path}
-                    className={row.entry.path === activePath ? 'note-item active' : 'note-item'}
-                    style={{ paddingLeft: 9 + row.depth * 14 }}
-                    onClick={() => void selectNote(row.entry.path)}
+                    className={entry.path === activePath ? 'note-item active' : 'note-item'}
+                    onClick={() => void selectNote(entry.path)}
                   >
                     <BookOpen size={15} />
-                    <span>{row.entry.name.replace(/\.md$/i, '')}</span>
+                    <span>{entry.title}</span>
                     <ChevronRight size={14} />
                   </button>
-                ),
-              )}
+                  <button
+                    className="note-delete"
+                    title="노트 삭제"
+                    aria-label={`${entry.title} 삭제`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      requestDeleteNote(entry.path);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))
+            : buildVaultTree(entries, folders).map((row) => {
+                if (row.kind === 'folder') {
+                  const isRenaming = renaming?.kind === 'folder' && renaming.path === row.path;
+                  return (
+                    <div
+                      key={`folder:${row.path}`}
+                      className={dragOverTarget === row.path ? 'folder-item drop-target' : 'folder-item'}
+                      style={{ paddingLeft: 9 + row.depth * 14 }}
+                      onDragOver={(event) => { event.preventDefault(); setDragOverTarget(row.path); }}
+                      onDragLeave={() => setDragOverTarget((current) => (current === row.path ? null : current))}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        setDragOverTarget(null);
+                        const draggedPath = event.dataTransfer.getData('text/webobsidian-path');
+                        if (draggedPath) void moveIntoFolder(draggedPath, row.path);
+                      }}
+                    >
+                      <Folder size={14} />
+                      {isRenaming ? (
+                        <input
+                          className="rename-input"
+                          autoFocus
+                          value={renameValue}
+                          onChange={(event) => setRenameValue(event.target.value)}
+                          onKeyDown={handleRenameKeyDown}
+                          onBlur={handleRenameBlur}
+                        />
+                      ) : (
+                        <span onDoubleClick={() => startRenameFolder(row.path)}>{row.name}</span>
+                      )}
+                    </div>
+                  );
+                }
+
+                const isRenaming = renaming?.kind === 'note' && renaming.path === row.entry.path;
+                return (
+                  <div
+                    key={row.entry.path}
+                    className="note-row"
+                    draggable={!isRenaming}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('text/webobsidian-path', row.entry.path);
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
+                  >
+                    {isRenaming ? (
+                      <div className="note-item renaming" style={{ paddingLeft: 9 + row.depth * 14 }}>
+                        <BookOpen size={15} />
+                        <input
+                          className="rename-input"
+                          autoFocus
+                          value={renameValue}
+                          onChange={(event) => setRenameValue(event.target.value)}
+                          onKeyDown={handleRenameKeyDown}
+                          onBlur={handleRenameBlur}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          className={row.entry.path === activePath ? 'note-item active' : 'note-item'}
+                          style={{ paddingLeft: 9 + row.depth * 14 }}
+                          onClick={() => void selectNote(row.entry.path)}
+                          onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            startRenameNote(row.entry.path);
+                          }}
+                        >
+                          <BookOpen size={15} />
+                          <span>{row.entry.name.replace(/\.md$/i, '')}</span>
+                          <ChevronRight size={14} />
+                        </button>
+                        <button
+                          className="note-delete"
+                          title="노트 삭제"
+                          aria-label={`${row.entry.name} 삭제`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            requestDeleteNote(row.entry.path);
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
         </nav>
         <div className="storage-note">
           <span className="status-dot" />
@@ -438,6 +680,16 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{error}</span><button onClick={() => setError(undefined)}>닫기</button></div>
       ) : null}
       {settingsOpen ? <AppearanceSettingsPanel settings={appearance} onChange={setAppearance} onClose={closeSettings} /> : null}
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="노트 삭제"
+          message={`'${deleteTarget}' 노트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+          confirmLabel="삭제"
+          danger
+          onConfirm={() => void confirmDeleteNote()}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }

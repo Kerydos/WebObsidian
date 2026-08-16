@@ -96,4 +96,36 @@ export class LocalFsVaultRepository implements VaultRepository {
     }
     return { path: normalized, name: fileName(normalized) };
   }
+
+  async remove(path: string): Promise<void> {
+    const normalized = normalizeVaultPath(path);
+    const { directory, name } = await locate(this.root, normalized);
+    await directory.removeEntry(name);
+  }
+
+  async rename(path: string, newPath: string): Promise<VaultDocument> {
+    const document = await this.read(path);
+    const moved = await this.write(newPath, document.content);
+    await this.remove(path);
+    return moved;
+  }
+
+  async renameFolder(path: string, newPath: string): Promise<VaultFolderEntry> {
+    const source = normalizeVaultPath(path);
+    const destination = normalizeVaultPath(newPath);
+    const [entries, folders] = await Promise.all([this.list(), this.listFolders()]);
+    const prefix = `${source}/`;
+
+    for (const folder of folders.filter((item) => item.path.startsWith(prefix)).sort((a, b) => a.path.length - b.path.length)) {
+      await this.createFolder(destination + folder.path.slice(source.length));
+    }
+    await this.createFolder(destination);
+    for (const entry of entries.filter((item) => item.path.startsWith(prefix))) {
+      await this.rename(entry.path, destination + entry.path.slice(source.length));
+    }
+
+    const { directory, name } = await locate(this.root, source);
+    await directory.removeEntry(name, { recursive: true });
+    return { path: destination, name: fileName(destination) };
+  }
 }

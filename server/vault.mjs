@@ -178,4 +178,105 @@ export class FileVault {
     }
     return entryFor(filePath, vaultPath, Buffer.from(content));
   }
+
+  remove(path) {
+    const operation = this.writeQueue.then(() => this.removeFile(path));
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async removeFile(path) {
+    const { filePath } = this.resolvePath(path);
+    try {
+      const details = await lstat(filePath);
+      if (details.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
+      const realFile = await realpath(filePath);
+      if (!isInside(this.realRoot, realFile)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    } catch (error) {
+      if (error?.code === 'ENOENT') throw new VaultError('파일을 찾을 수 없습니다.', 404);
+      throw error;
+    }
+    await unlink(filePath);
+  }
+
+  move(path, newPath) {
+    const operation = this.writeQueue.then(() => this.moveFile(path, newPath));
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async moveFile(path, newPath) {
+    const { filePath: source } = this.resolvePath(path);
+    const { vaultPath: destVaultPath, filePath: destination } = this.resolvePath(newPath);
+    try {
+      const details = await lstat(source);
+      if (details.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
+      const realFile = await realpath(source);
+      if (!isInside(this.realRoot, realFile)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    } catch (error) {
+      if (error?.code === 'ENOENT') throw new VaultError('파일을 찾을 수 없습니다.', 404);
+      throw error;
+    }
+    if (source === destination) return entryFor(source, destVaultPath);
+
+    const destExists = await lstat(destination).catch((error) => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (destExists) throw new VaultError('같은 경로의 노트가 이미 있습니다.', 409);
+
+    const destParent = dirname(destination);
+    await mkdir(destParent, { recursive: true });
+    const realDestParent = await realpath(destParent);
+    if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+
+    await rename(source, destination);
+    return entryFor(destination, destVaultPath);
+  }
+
+  moveFolder(path, newPath) {
+    const operation = this.writeQueue.then(() => this.moveFolderEntry(path, newPath));
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async moveFolderEntry(path, newPath) {
+    const { vaultPath: sourceVaultPath, folderPath: source } = this.resolveFolderPath(path);
+    const { vaultPath: destVaultPath, folderPath: destination } = this.resolveFolderPath(newPath);
+    if (destVaultPath === sourceVaultPath) {
+      const details = await lstat(source).catch((error) => {
+        if (error?.code === 'ENOENT') throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+        throw error;
+      });
+      if (details.isSymbolicLink() || !details.isDirectory()) throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+      return { path: sourceVaultPath, name: basename(sourceVaultPath) };
+    }
+    if (destVaultPath.startsWith(`${sourceVaultPath}/`)) {
+      throw new VaultError('폴더를 그 하위 폴더로 이동할 수 없습니다.');
+    }
+
+    try {
+      const details = await lstat(source);
+      if (details.isSymbolicLink() || !details.isDirectory()) throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+      const realFolder = await realpath(source);
+      if (!isInside(this.realRoot, realFolder)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    } catch (error) {
+      if (error?.code === 'ENOENT') throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+      throw error;
+    }
+
+    const destExists = await lstat(destination).catch((error) => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (destExists) throw new VaultError('같은 이름의 항목이 이미 있습니다.', 409);
+
+    const destParent = dirname(destination);
+    await mkdir(destParent, { recursive: true });
+    const realDestParent = await realpath(destParent);
+    if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+
+    await rename(source, destination);
+    return { path: destVaultPath, name: basename(destVaultPath) };
+  }
 }

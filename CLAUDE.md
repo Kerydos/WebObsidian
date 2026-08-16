@@ -34,8 +34,9 @@
 - `src/lib/vault/localFs.ts`: Chromium 계열 브라우저의 로컬 폴더 연결 지원
 - `src/lib/vault/opfs.ts`: 기존 브라우저 OPFS 저장소 구현
 - `src/components/MarkdownEditor.tsx`: CodeMirror 편집기와 라이브 프리뷰 연결
-- `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현
-- `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트
+- `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현(콜아웃, 프론트매터, 표 셀 인라인 렌더링 포함)
+- `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵
+- `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
 - `compose.yaml`, `Dockerfile`: 컨테이너 배포 설정
 
 ## 개발 환경 실행
@@ -131,23 +132,30 @@ docker compose up -d --build
 현재 지원 범위:
 
 - ATX 및 Setext 제목
-- 굵게, 기울임, 취소선, 인라인 코드
-- 순서·비순서 목록과 인용문
+- 굵게, 기울임, 취소선, 인라인 코드, 형광펜(`==하이라이트==`, Obsidian 확장 문법)
+- 순서·비순서 목록(다단계 중첩 포함)과 인용문(다단계 중첩 포함)
+- Obsidian 스타일 콜아웃(`> [!note]`, `> [!tip]`, `> [!warning]` 등) — 유형별 색상과 아이콘, 제목 생략 시 기본 라벨
 - 클릭 가능한 작업 목록 체크박스
 - 일반 링크, 자동 링크, 참조 링크
 - 위키 링크 `[[문서|표시 이름]]`
 - 이미지
 - fenced 및 indented 코드 블록
-- GFM 표
+- GFM 표 — 셀 내부의 굵게·기울임·취소선·인라인 코드·형광펜·링크도 함께 렌더링
 - 수평선
 - 링크 참조 정의 숨김
+- YAML 프론트매터(`---`로 감싼 블록)를 별도 속성 위젯으로 표시. 프론트매터가 없으면 문서 맨 앞의 `---`는 평범한 수평선으로 처리된다.
+- 목록 안에서 `Tab`/`Shift-Tab`으로 들여쓰기·내어쓰기(목록 밖에서는 기본 포커스 이동 동작을 그대로 둔다)
+- 목록·인용문·작업 목록에서 `Enter`로 다음 줄에 같은 마크업을 자동으로 이어 쓴다(CodeMirror `@codemirror/lang-markdown` 기본 동작)
 
 상호작용 원칙:
 
 - 렌더링된 요소를 일반 클릭하면 원문 편집 상태로 돌아간다.
-- 링크와 위키 링크는 `Cmd` 또는 `Ctrl`을 누른 채 클릭하면 이동한다.
+- 예외: 위키 링크는 일반 클릭 시 바로 연결된 노트로 이동한다. 위키 링크의 원문(`[[...]]`)을 편집하려면 `Cmd` 또는 `Ctrl`을 누른 채 클릭한다(Obsidian의 라이브 프리뷰 동작과 동일).
+- 일반 마크다운 링크(`[text](url)`)는 여전히 일반 클릭 시 원문 편집 상태로 돌아가고, `Cmd`/`Ctrl`+클릭으로 새 탭에서 연다.
 - URL은 검사하며 `javascript:` 같은 위험한 스킴을 차단한다.
 - 블록 위젯은 완전한 줄 단위 범위에만 적용하여 CodeMirror 장식 중첩 오류를 방지한다.
+
+형광펜과 콜아웃은 표준 Markdown/GFM에 없는 Obsidian 확장 문법이므로, `src/components/editor/markdownExtensions.ts`에 커스텀 `@lezer/markdown` 확장(`Highlight`)과 `src/components/editor/livePreview.ts`의 블록쿼트 첫 줄 패턴 매칭(콜아웃)으로 직접 구현했다. 표 셀 내부 렌더링은 셀 텍스트를 별도의 작은 Markdown 파서 인스턴스로 다시 파싱해 DOM을 구성하며(`renderInlineMarkdown`), CodeMirror 데코레이션과는 무관하게 정적 HTML만 생성하므로 셀 안에서 직접 편집할 수는 없다(테이블 위젯 전체를 클릭하면 원문 편집 모드로 전환된다).
 
 ## 화면 설정
 
@@ -171,15 +179,17 @@ npm test
 npm run build
 ```
 
-마지막 확인 결과는 테스트 6개 파일, 총 27개 테스트 통과와 프로덕션 빌드 성공이다. 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. 현재 환경에서는 브라우저 런타임을 사용할 수 없어 실제 브라우저 기반 시각 QA는 수행하지 못했고, 단위 테스트·빌드·HTTP 모듈 응답으로 검증했다.
+마지막 확인 결과는 테스트 7개 파일, 총 53개 테스트 통과와 프로덕션 빌드 성공이다. 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 
-- 수식(KaTeX), Mermaid, Obsidian callout, 임의의 raw HTML 렌더링은 지원하지 않는다.
+- 수식(KaTeX), Mermaid, 임의의 raw HTML 렌더링은 지원하지 않는다.
 - 보안을 위해 raw HTML을 실행해서는 안 된다.
-- 표 위젯의 셀 내용은 현재 일반 텍스트이며 셀 내부 인라인 마크다운을 중첩 렌더링하지 않는다.
+- 각주(`[^1]`, `[^1]: 내용`)는 아직 지원하지 않는다. `@lezer/markdown`에 내장 문법이 없어 커스텀 파서가 필요하며, 후속 작업 대상이다.
+- Obsidian 임베드(`![[노트]]`, `![[이미지.png]]`, 노트 전개)는 아직 지원하지 않는다. 이미지 첨부 파일을 서빙하는 백엔드 엔드포인트가 없어 우선 보류했다(아래 첨부 파일 항목 참고).
+- 표 셀 안의 인라인 마크다운은 별도 파서로 다시 렌더링한 정적 HTML이라 셀 내부를 직접 클릭 편집할 수 없다. 전체 위젯을 클릭하면 원문 편집 모드로 전환된다.
 - 코드 블록은 언어 이름만 표시하고 언어별 구문 강조는 제공하지 않는다.
-- 서버 Vault API는 `.md`만 제공하므로 Vault 내부 이미지 첨부 파일을 별도로 서비스하지 않는다. 상대 이미지 경로는 첨부 파일 제공 기능 없이는 정상 표시되지 않을 수 있다.
+- 서버 Vault API는 `.md`만 제공하므로 Vault 내부 이미지 첨부 파일을 별도로 서비스하지 않는다. 상대 이미지 경로와 Obsidian 임베드는 첨부 파일 제공 기능 없이는 정상 표시되지 않을 수 있다.
 - 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 명확한 서버 저장소 복귀 UI는 아직 없다.
 
 ## 변경 시 주의사항

@@ -125,10 +125,22 @@ const server = createServer(async (request, response) => {
         const body = await readJson(request);
         return sendJson(response, 200, await vault.write(path, body.content, body));
       }
+      if (request.method === 'DELETE') {
+        await vault.remove(path);
+        return sendJson(response, 200, { deleted: true });
+      }
+      if (request.method === 'PATCH') {
+        const body = await readJson(request);
+        return sendJson(response, 200, await vault.move(path, body.newPath));
+      }
     }
-    if (request.method === 'POST' && url.pathname === '/api/vault/folder') {
+    if (url.pathname === '/api/vault/folder') {
       const path = url.searchParams.get('path');
-      return sendJson(response, 200, await vault.createFolder(path));
+      if (request.method === 'POST') return sendJson(response, 200, await vault.createFolder(path));
+      if (request.method === 'PATCH') {
+        const body = await readJson(request);
+        return sendJson(response, 200, await vault.moveFolder(path, body.newPath));
+      }
     }
     if (url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'API를 찾을 수 없습니다.' });
     await serveStatic(request, response, url.pathname);

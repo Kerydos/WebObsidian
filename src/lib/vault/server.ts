@@ -54,4 +54,24 @@ export class ServerVaultRepository implements VaultRepository {
   createFolder(path: string): Promise<VaultFolderEntry> {
     return request(`/api/vault/folder?path=${encodeURIComponent(normalizeVaultPath(path))}`, { method: 'POST' });
   }
+
+  async remove(path: string): Promise<void> {
+    await request(fileUrl(path), { method: 'DELETE' });
+  }
+
+  rename(path: string, newPath: string): Promise<VaultDocument> {
+    return request(fileUrl(path), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPath: normalizeVaultPath(newPath) }),
+    });
+  }
+
+  renameFolder(path: string, newPath: string): Promise<VaultFolderEntry> {
+    return request(`/api/vault/folder?path=${encodeURIComponent(normalizeVaultPath(path))}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPath: normalizeVaultPath(newPath) }),
+    });
+  }
 }

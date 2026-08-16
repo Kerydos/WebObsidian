@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { livePreview } from './editor/livePreview';
+import { Highlight, listIndentKeymap } from './editor/markdownExtensions';
 
 interface MarkdownEditorProps {
   value: string;
@@ -15,8 +16,9 @@ export default function MarkdownEditor({ value, onChange, onNavigateWikiLink }: 
   navigateRef.current = onNavigateWikiLink;
   const extensions = useMemo(
     () => [
-      markdown({ base: markdownLanguage }),
+      markdown({ base: markdownLanguage, extensions: Highlight }),
       livePreview((target) => navigateRef.current?.(target)),
+      keymap.of(listIndentKeymap),
       EditorView.lineWrapping,
       EditorView.theme({
         '&': { height: '100%', backgroundColor: 'transparent' },

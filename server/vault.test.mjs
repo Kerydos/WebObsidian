@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, symlink } from 'node:fs/promises';
+import { access, mkdtemp, readdir, readFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -81,5 +81,89 @@ describe('server file vault', () => {
     await expect(vault.createFolder('taken.md')).rejects.toMatchObject({ status: 409 });
     await expect(vault.createFolder('../secret')).rejects.toMatchObject({ status: 400 });
     await expect(vault.createFolder('escape/nested')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('deletes an existing note and rejects deleting a missing one', async () => {
+    const { root, vault } = await createVault();
+    await vault.write('projects/plan.md', '# Plan', { createOnly: true });
+
+    await vault.remove('projects/plan.md');
+
+    await expect(access(join(root, 'projects/plan.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await vault.list()).toEqual([]);
+    await expect(vault.remove('projects/plan.md')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('rejects deleting traversal paths and symlink escapes', async () => {
+    const { root, vault } = await createVault();
+    const outside = await mkdtemp(join(tmpdir(), 'webobsidian-outside-'));
+    await symlink(join(outside, 'secret.md'), join(root, 'linked.md'));
+
+    await expect(vault.remove('../secret.md')).rejects.toMatchObject({ status: 400 });
+    await expect(vault.remove('linked.md')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('serializes a delete after a pending write for the same path', async () => {
+    const { vault } = await createVault();
+    const created = await vault.write('note.md', 'first', { createOnly: true });
+
+    const results = await Promise.allSettled([
+      vault.write('note.md', 'second', { expectedRevision: created.revision }),
+      vault.remove('note.md'),
+    ]);
+
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+    await expect(vault.read('note.md')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('moves a note to a new path, including into a new folder', async () => {
+    const { root, vault } = await createVault();
+    await vault.write('note.md', 'content', { createOnly: true });
+
+    const moved = await vault.move('note.md', 'projects/renamed.md');
+
+    expect(moved).toEqual(expect.objectContaining({ path: 'projects/renamed.md', name: 'renamed.md' }));
+    await expect(access(join(root, 'note.md'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(join(root, 'projects/renamed.md'), 'utf8')).toBe('content');
+  });
+
+  it('rejects moving a note onto an existing note or a missing source', async () => {
+    const { vault } = await createVault();
+    await vault.write('a.md', 'a', { createOnly: true });
+    await vault.write('b.md', 'b', { createOnly: true });
+
+    await expect(vault.move('a.md', 'b.md')).rejects.toMatchObject({ status: 409 });
+    await expect(vault.move('missing.md', 'c.md')).rejects.toMatchObject({ status: 404 });
+    await expect(vault.move('../secret.md', 'c.md')).rejects.toMatchObject({ status: 400 });
+    await expect(vault.move('a.md', '../c.md')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('moves and renames folders, including their nested contents', async () => {
+    const { root, vault } = await createVault();
+    await vault.createFolder('notes');
+    await vault.write('notes/a.md', 'a', { createOnly: true });
+
+    const moved = await vault.moveFolder('notes', 'archive/notes');
+
+    expect(moved).toEqual({ path: 'archive/notes', name: 'notes' });
+    await expect(access(join(root, 'notes'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(join(root, 'archive/notes/a.md'), 'utf8')).toBe('a');
+    const { folders } = await vault.scan();
+    expect(folders).toEqual([
+      expect.objectContaining({ path: 'archive' }),
+      expect.objectContaining({ path: 'archive/notes' }),
+    ]);
+  });
+
+  it('rejects invalid folder moves', async () => {
+    const { vault } = await createVault();
+    await vault.createFolder('notes');
+    await vault.createFolder('notes/nested');
+    await vault.createFolder('taken');
+    await vault.write('taken.md', 'x', { createOnly: true });
+
+    await expect(vault.moveFolder('notes', 'notes/nested/inside')).rejects.toMatchObject({ status: 400 });
+    await expect(vault.moveFolder('notes', 'taken')).rejects.toMatchObject({ status: 409 });
+    await expect(vault.moveFolder('missing', 'somewhere')).rejects.toMatchObject({ status: 404 });
   });
 });
