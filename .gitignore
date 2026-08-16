@@ -1,6 +1,8 @@
 node_modules/
 dist/
 /vault/
+.env
+!.env.example
 .vite/
 dev-dist/
 *.local

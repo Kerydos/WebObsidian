@@ -57,7 +57,9 @@ Docker Compose를 사용하면 저장 파일은 호스트의 `./vault` 폴더에
 
 ```bash
 mkdir -p vault
-export WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호'
+cp .env.example .env
+chmod 600 .env
+# .env의 WEBOBSIDIAN_PASSWORD를 12자 이상의 운영 비밀번호로 변경하세요.
 docker compose up -d --build
 ```
 
