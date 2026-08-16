@@ -10,16 +10,21 @@ import {
   HardDrive,
   Link2,
   LoaderCircle,
+  LogOut,
   Search,
+  Settings2,
   Sparkles,
 } from 'lucide-react';
 import type { VaultDocument, VaultEntry, VaultRepository } from './types/vault';
-import { OpfsVaultRepository } from './lib/vault/opfs';
+import { ServerVaultRepository } from './lib/vault/server';
 import { LocalFsVaultRepository } from './lib/vault/localFs';
 import { ensureMarkdownPath } from './lib/vault/path';
 import { backlinksFor, indexMarkdown, resolveLink, type NoteIndex } from './lib/markdown/indexer';
 import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
+import { LoginScreen } from './components/LoginScreen';
+import { AppearanceSettingsPanel } from './components/AppearanceSettings';
+import { APPEARANCE_STORAGE_KEY, appearanceVariables, parseAppearance } from './lib/settings/appearance';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 
@@ -27,7 +32,7 @@ type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 
 const welcomeNote = `# WebObsidian에 오신 것을 환영합니다
 
-이 볼트는 브라우저의 개인 파일 시스템에 저장됩니다. 네트워크가 끊겨도 편집할 수 있습니다.
+노트는 현재 선택한 볼트 저장소에 Markdown 파일로 저장됩니다.
 
 ## 시작하기
 
@@ -44,8 +49,42 @@ function messageOf(error: unknown) {
   return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 }
 
+type AuthStatus = 'checking' | 'authenticated' | 'anonymous';
+
 export function App() {
-  const [repository, setRepository] = useState<VaultRepository>(() => new OpfsVaultRepository());
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [authError, setAuthError] = useState<string>();
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('서버에 연결할 수 없습니다.');
+        const body = await response.json() as { authenticated: boolean };
+        setAuthStatus(body.authenticated ? 'authenticated' : 'anonymous');
+      })
+      .catch(() => {
+        setAuthError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+        setAuthStatus('anonymous');
+      });
+    const unauthorized = () => setAuthStatus('anonymous');
+    window.addEventListener('webobsidian:unauthorized', unauthorized);
+    return () => window.removeEventListener('webobsidian:unauthorized', unauthorized);
+  }, []);
+
+  if (authStatus === 'checking') {
+    return <div className="login-shell"><LoaderCircle className="spin" /></div>;
+  }
+  if (authStatus === 'anonymous') {
+    return <LoginScreen initialError={authError} onAuthenticated={() => {
+      setAuthError(undefined);
+      setAuthStatus('authenticated');
+    }} />;
+  }
+  return <WorkspaceApp onLoggedOut={() => setAuthStatus('anonymous')} />;
+}
+
+function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const [repository, setRepository] = useState<VaultRepository>(() => new ServerVaultRepository());
   const [entries, setEntries] = useState<VaultEntry[]>([]);
   const [documents, setDocuments] = useState<Map<string, VaultDocument>>(() => new Map());
   const [activePath, setActivePath] = useState<string>();
@@ -54,6 +93,14 @@ export function App() {
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appearance, setAppearance] = useState(() => {
+    try {
+      return parseAppearance(window.localStorage.getItem(APPEARANCE_STORAGE_KEY));
+    } catch {
+      return parseAppearance(null);
+    }
+  });
   const activePathRef = useRef(activePath);
   const editorValueRef = useRef(editorValue);
   const documentsRef = useRef(documents);
@@ -62,6 +109,14 @@ export function App() {
   useEffect(() => void (activePathRef.current = activePath), [activePath]);
   useEffect(() => void (editorValueRef.current = editorValue), [editorValue]);
   useEffect(() => void (documentsRef.current = documents), [documents]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
+    } catch {
+      // The setting still applies for this session when browser storage is unavailable.
+    }
+  }, [appearance]);
 
   const notes = useMemo(
     () => [...documents.values()].map((document) => indexMarkdown(document.path, document.content)),
@@ -233,19 +288,34 @@ export function App() {
     else setError(`연결된 노트를 찾을 수 없습니다: ${target}`);
   };
 
+  const logout = async () => {
+    await saveActive();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      onLoggedOut();
+    }
+  };
+
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={appearanceVariables(appearance)}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark"><Sparkles size={16} /></span>
           <strong>WebObsidian</strong>
           <span className="vault-pill"><HardDrive size={13} /> {repository.name}</span>
         </div>
-        <div className="save-status" data-state={saveState}>
-          {saveState === 'saving' ? <LoaderCircle size={14} className="spin" /> : null}
-          {saveState === 'saved' ? <Check size={14} /> : null}
-          {saveState === 'error' ? <CircleAlert size={14} /> : null}
-          {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
+        <div className="topbar-actions">
+          <div className="save-status" data-state={saveState}>
+            {saveState === 'saving' ? <LoaderCircle size={14} className="spin" /> : null}
+            {saveState === 'saved' ? <Check size={14} /> : null}
+            {saveState === 'error' ? <CircleAlert size={14} /> : null}
+            {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
+          </div>
+          <button className="topbar-button" onClick={() => setSettingsOpen(true)} title="화면 설정" aria-label="화면 설정 열기"><Settings2 size={16} /></button>
+          <button className="logout-button" onClick={() => void logout()} title="로그아웃"><LogOut size={15} /> 로그아웃</button>
         </div>
       </header>
 
@@ -275,7 +345,7 @@ export function App() {
         </nav>
         <div className="storage-note">
           <span className="status-dot" />
-          {repository.kind === 'opfs' ? '브라우저에 로컬 저장' : '로컬 폴더에 직접 저장'}
+          {repository.kind === 'server' ? '서버 폴더에 저장' : repository.kind === 'opfs' ? '브라우저에 로컬 저장' : '로컬 폴더에 직접 저장'}
         </div>
       </aside>
 
@@ -284,7 +354,7 @@ export function App() {
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : activePath ? (
           <Suspense fallback={<div className="center-state"><LoaderCircle className="spin" /></div>}>
-            <MarkdownEditor key={activePath} value={editorValue} onChange={setEditorValue} />
+            <MarkdownEditor key={activePath} value={editorValue} onChange={setEditorValue} onNavigateWikiLink={navigateLink} />
           </Suspense>
         ) : (
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
@@ -327,6 +397,7 @@ export function App() {
       {error ? (
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{error}</span><button onClick={() => setError(undefined)}>닫기</button></div>
       ) : null}
+      {settingsOpen ? <AppearanceSettingsPanel settings={appearance} onChange={setAppearance} onClose={closeSettings} /> : null}
     </div>
   );
 }
