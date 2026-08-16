@@ -732,7 +732,7 @@ const livePreviewTheme = EditorView.theme({
   '.cm-line.cm-live-callout-danger, .cm-live-callout-header.cm-live-callout-danger': { borderLeftColor: '#c0392b', background: 'color-mix(in srgb, #c0392b 10%, transparent)', color: '#a5301f' },
   '.cm-line.cm-live-callout-example, .cm-live-callout-header.cm-live-callout-example': { borderLeftColor: '#8b6bc9', background: 'color-mix(in srgb, #8b6bc9 10%, transparent)', color: '#6d4fa8' },
   '.cm-line.cm-live-callout-quote, .cm-live-callout-header.cm-live-callout-quote': { borderLeftColor: 'var(--muted)', background: 'var(--markdown-quote-bg)', color: 'var(--markdown-muted)' },
-  '.cm-live-checkbox': { width: '16px', height: '16px', margin: '0 8px 0 0', verticalAlign: '-2px', accentColor: 'var(--accent)', cursor: 'pointer' },
+  '.cm-live-checkbox': { width: '0.8em', height: '0.8em', margin: '0 8px 0 0', verticalAlign: '0', accentColor: 'var(--accent)', cursor: 'pointer' },
   '.cm-live-link': { color: 'var(--markdown-link)', fontWeight: '560', textDecoration: 'none', cursor: 'text' },
   '.cm-live-link:hover': { color: 'var(--markdown-link-hover)', textDecoration: 'none' },
   '.cm-live-wiki-link': { padding: '1px 6px', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)', borderRadius: 'calc(var(--widget-radius) * .625)', background: 'var(--accent-soft)', color: 'var(--markdown-link-hover)', cursor: 'text', font: 'inherit', fontWeight: '600' },

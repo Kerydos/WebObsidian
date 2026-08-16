@@ -24,7 +24,7 @@ export const defaultAppearance: AppearanceSettings = {
   headingFont: 'sans',
   codeFont: 'system',
   documentStyle: 'comfortable',
-  fontSize: 16,
+  fontSize: 20,
   lineHeight: 1.8,
   accent: '#bf5f3b',
 };
