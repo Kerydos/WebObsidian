@@ -1,4 +1,4 @@
-import type { VaultDocument, VaultEntry, VaultRepository } from '../../types/vault';
+import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from '../../types/vault';
 import { fileName, normalizeVaultPath } from './path';
 
 async function scan(directory: FileSystemDirectoryHandle, prefix = ''): Promise<VaultEntry[]> {
@@ -14,6 +14,18 @@ async function scan(directory: FileSystemDirectoryHandle, prefix = ''): Promise<
     }
   }
   return entries;
+}
+
+async function scanFolders(directory: FileSystemDirectoryHandle, prefix = ''): Promise<VaultFolderEntry[]> {
+  const folders: VaultFolderEntry[] = [];
+  for await (const [name, handle] of directory.entries()) {
+    if (name === '.git' || name === '.trash') continue;
+    if (handle.kind !== 'directory') continue;
+    const path = prefix ? `${prefix}/${name}` : name;
+    folders.push({ path, name });
+    folders.push(...(await scanFolders(handle, path)));
+  }
+  return folders;
 }
 
 async function locate(root: FileSystemDirectoryHandle, path: string, create = false) {
@@ -36,6 +48,10 @@ export class LocalFsVaultRepository implements VaultRepository {
 
   async list() {
     return (await scan(this.root)).sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async listFolders() {
+    return (await scanFolders(this.root)).sort((a, b) => a.path.localeCompare(b.path));
   }
 
   async read(path: string): Promise<VaultDocument> {
@@ -70,5 +86,14 @@ export class LocalFsVaultRepository implements VaultRepository {
 
   create(path: string, content = '') {
     return this.write(path, content);
+  }
+
+  async createFolder(path: string): Promise<VaultFolderEntry> {
+    const normalized = normalizeVaultPath(path);
+    let directory = this.root;
+    for (const segment of normalized.split('/')) {
+      directory = await directory.getDirectoryHandle(segment, { create: true });
+    }
+    return { path: normalized, name: fileName(normalized) };
   }
 }

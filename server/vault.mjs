@@ -20,6 +20,15 @@ export function normalizeVaultPath(path) {
   return normalized;
 }
 
+export function normalizeFolderPath(path) {
+  if (typeof path !== 'string') throw new VaultError('폴더 경로가 필요합니다.');
+  const normalized = path.trim().replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
+  if (!normalized || INVALID_SEGMENT.test(normalized)) {
+    throw new VaultError('올바르지 않은 폴더 경로입니다.');
+  }
+  return normalized;
+}
+
 function revisionOf(content) {
   return createHash('sha256').update(content).digest('hex');
 }
@@ -60,22 +69,56 @@ export class FileVault {
     return { vaultPath, filePath };
   }
 
-  async list() {
+  resolveFolderPath(path) {
+    const vaultPath = normalizeFolderPath(path);
+    const folderPath = resolve(this.root, ...vaultPath.split('/'));
+    if (!isInside(this.root, folderPath)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    return { vaultPath, folderPath };
+  }
+
+  async scan() {
     const entries = [];
+    const folders = [];
     const scan = async (directory, prefix = '') => {
       for (const item of await readdir(directory, { withFileTypes: true })) {
         if (item.isSymbolicLink() || item.name === '.git' || item.name === '.trash') continue;
         const itemPath = resolve(directory, item.name);
         const vaultPath = prefix ? `${prefix}/${item.name}` : item.name;
-        if (item.isDirectory()) await scan(itemPath, vaultPath);
-        else if (item.isFile() && item.name.toLowerCase().endsWith('.md')) {
+        if (item.isDirectory()) {
+          folders.push({ path: vaultPath, name: item.name });
+          await scan(itemPath, vaultPath);
+        } else if (item.isFile() && item.name.toLowerCase().endsWith('.md')) {
           const details = await stat(itemPath);
           entries.push({ path: vaultPath, name: item.name, size: details.size, modifiedAt: details.mtimeMs });
         }
       }
     };
     await scan(this.root);
-    return entries.sort((a, b) => a.path.localeCompare(b.path));
+    return {
+      entries: entries.sort((a, b) => a.path.localeCompare(b.path)),
+      folders: folders.sort((a, b) => a.path.localeCompare(b.path)),
+    };
+  }
+
+  async list() {
+    return (await this.scan()).entries;
+  }
+
+  async createFolder(path) {
+    const { vaultPath, folderPath } = this.resolveFolderPath(path);
+    const existing = await lstat(folderPath).catch((error) => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (existing) {
+      if (existing.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
+      if (existing.isDirectory()) throw new VaultError('같은 이름의 폴더가 이미 있습니다.', 409);
+      throw new VaultError('같은 이름의 파일이 이미 있습니다.', 409);
+    }
+    await mkdir(folderPath, { recursive: true });
+    const realFolder = await realpath(folderPath);
+    if (!isInside(this.realRoot, realFolder)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    return { path: vaultPath, name: basename(vaultPath) };
   }
 
   async read(path) {

@@ -1,4 +1,4 @@
-import type { VaultDocument, VaultEntry, VaultRepository } from '../../types/vault';
+import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from '../../types/vault';
 import { normalizeVaultPath } from './path';
 
 type ErrorResponse = { error?: string };
@@ -26,6 +26,11 @@ export class ServerVaultRepository implements VaultRepository {
     return result.entries;
   }
 
+  async listFolders(): Promise<VaultFolderEntry[]> {
+    const result = await request<{ folders: VaultFolderEntry[] }>('/api/vault');
+    return result.folders;
+  }
+
   read(path: string): Promise<VaultDocument> {
     return request(fileUrl(path));
   }
@@ -44,5 +49,9 @@ export class ServerVaultRepository implements VaultRepository {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content, createOnly: true }),
     });
+  }
+
+  createFolder(path: string): Promise<VaultFolderEntry> {
+    return request(`/api/vault/folder?path=${encodeURIComponent(normalizeVaultPath(path))}`, { method: 'POST' });
   }
 }

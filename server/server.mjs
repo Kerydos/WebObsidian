@@ -29,6 +29,15 @@ const mimeTypes = {
   '.woff2': 'font/woff2',
 };
 
+function clientIdFor(request) {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    const hops = forwarded.split(',').map((hop) => hop.trim()).filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+  return request.socket.remoteAddress ?? 'unknown';
+}
+
 function sendJson(response, status, body, headers = {}) {
   response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -91,7 +100,7 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
       const body = await readJson(request);
-      const token = auth.login(body.password, request.socket.remoteAddress ?? 'unknown');
+      const token = auth.login(body.password, clientIdFor(request));
       return sendJson(response, 200, { authenticated: true }, {
         'Set-Cookie': sessionCookie(token, { secure: secureCookie }),
       });
@@ -106,7 +115,8 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 401, { error: '로그인이 필요합니다.' });
     }
     if (request.method === 'GET' && url.pathname === '/api/vault') {
-      return sendJson(response, 200, { name: 'Server Vault', entries: await vault.list() });
+      const { entries, folders } = await vault.scan();
+      return sendJson(response, 200, { name: 'Server Vault', entries, folders });
     }
     if (url.pathname === '/api/vault/file') {
       const path = url.searchParams.get('path');
@@ -115,6 +125,10 @@ const server = createServer(async (request, response) => {
         const body = await readJson(request);
         return sendJson(response, 200, await vault.write(path, body.content, body));
       }
+    }
+    if (request.method === 'POST' && url.pathname === '/api/vault/folder') {
+      const path = url.searchParams.get('path');
+      return sendJson(response, 200, await vault.createFolder(path));
     }
     if (url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'API를 찾을 수 없습니다.' });
     await serveStatic(request, response, url.pathname);

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, symlink } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -54,5 +54,32 @@ describe('server file vault', () => {
     await expect(vault.write('secret.txt', 'no')).rejects.toMatchObject({ status: 400 });
     await expect(vault.write('escape/secret.md', 'no')).rejects.toMatchObject({ status: 400 });
     await expect(vault.read('linked.md')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('creates empty nested folders and lists them separately from notes', async () => {
+    const { root, vault } = await createVault();
+    const created = await vault.createFolder('projects/2026');
+
+    expect(created).toEqual({ path: 'projects/2026', name: '2026' });
+    expect(await readdir(join(root, 'projects'))).toEqual(['2026']);
+    const { entries, folders } = await vault.scan();
+    expect(entries).toEqual([]);
+    expect(folders).toEqual([
+      expect.objectContaining({ path: 'projects' }),
+      expect.objectContaining({ path: 'projects/2026' }),
+    ]);
+  });
+
+  it('rejects duplicate folders and traversal/symlink escapes for folder creation', async () => {
+    const { root, vault } = await createVault();
+    const outside = await mkdtemp(join(tmpdir(), 'webobsidian-outside-'));
+    await symlink(outside, join(root, 'escape'));
+    await vault.write('taken.md', 'content', { createOnly: true });
+    await vault.createFolder('notes');
+
+    await expect(vault.createFolder('notes')).rejects.toMatchObject({ status: 409 });
+    await expect(vault.createFolder('taken.md')).rejects.toMatchObject({ status: 409 });
+    await expect(vault.createFolder('../secret')).rejects.toMatchObject({ status: 400 });
+    await expect(vault.createFolder('escape/nested')).rejects.toMatchObject({ status: 400 });
   });
 });

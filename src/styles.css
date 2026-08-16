@@ -157,6 +157,8 @@ button { color: inherit; }
 .note-item:hover { background: color-mix(in srgb, var(--surface-raised) 60%, transparent); }
 .note-item.active { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 3px rgba(20,18,16,.12); font-weight: 600; }
 .note-item.active > svg:last-child { opacity: 1; color: var(--accent); }
+.folder-item { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; font-size: 11px; font-weight: 600; color: #8d857b; }
+.folder-item span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .storage-note { display: flex; align-items: center; gap: 7px; padding: 11px 7px 2px; border-top: 1px solid var(--line); font-size: 10px; color: var(--muted); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #5f9e6e; box-shadow: 0 0 0 3px rgba(95,158,110,.12); }
 

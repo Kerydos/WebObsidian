@@ -5,7 +5,9 @@ import {
   ChevronRight,
   CircleAlert,
   FilePlus2,
+  Folder,
   FolderOpen,
+  FolderPlus,
   Hash,
   HardDrive,
   Link2,
@@ -15,10 +17,11 @@ import {
   Settings2,
   Sparkles,
 } from 'lucide-react';
-import type { VaultDocument, VaultEntry, VaultRepository } from './types/vault';
+import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from './types/vault';
 import { ServerVaultRepository } from './lib/vault/server';
 import { LocalFsVaultRepository } from './lib/vault/localFs';
-import { ensureMarkdownPath } from './lib/vault/path';
+import { ensureMarkdownPath, normalizeVaultPath } from './lib/vault/path';
+import { buildVaultTree } from './lib/vault/tree';
 import { backlinksFor, indexMarkdown, resolveLink, type NoteIndex } from './lib/markdown/indexer';
 import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
@@ -86,6 +89,7 @@ export function App() {
 function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [repository, setRepository] = useState<VaultRepository>(() => new ServerVaultRepository());
   const [entries, setEntries] = useState<VaultEntry[]>([]);
+  const [folders, setFolders] = useState<VaultFolderEntry[]>([]);
   const [documents, setDocuments] = useState<Map<string, VaultDocument>>(() => new Map());
   const [activePath, setActivePath] = useState<string>();
   const [editorValue, setEditorValue] = useState('');
@@ -147,6 +151,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         await nextRepository.create('Welcome.md', welcomeNote);
         nextEntries = await nextRepository.list();
       }
+      const nextFolders = await nextRepository.listFolders();
       const loaded = await Promise.all(nextEntries.map((entry) => nextRepository.read(entry.path)));
       const nextDocuments = new Map(loaded.map((document) => [document.path, document]));
       await db.transaction('rw', db.notes, async () => {
@@ -162,6 +167,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       });
       setRepository(nextRepository);
       setEntries(nextEntries);
+      setFolders(nextFolders);
       setDocuments(nextDocuments);
       const firstPath = nextEntries[0]?.path;
       setActivePath(firstPath);
@@ -282,6 +288,19 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     }
   };
 
+  const createFolder = async () => {
+    const requested = window.prompt('새 폴더 이름을 입력하세요.');
+    if (!requested) return;
+    try {
+      const path = normalizeVaultPath(requested);
+      if (folders.some((folder) => folder.path === path)) throw new Error('같은 이름의 폴더가 이미 있습니다.');
+      const created = await repository.createFolder(path);
+      setFolders((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
   const navigateLink = (target: string) => {
     const resolved = resolveLink(target, entries.map((entry) => entry.path));
     if (resolved) void selectNote(resolved);
@@ -322,6 +341,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       <aside className="sidebar">
         <div className="sidebar-actions">
           <button className="primary-action" onClick={() => void createNote()}><FilePlus2 size={16} /> 새 노트</button>
+          <button className="icon-action" onClick={() => void createFolder()} title="새 폴더"><FolderPlus size={17} /></button>
           <button className="icon-action" onClick={() => void openLocalFolder()} title="로컬 폴더 열기"><FolderOpen size={17} /></button>
         </div>
         <label className="search-box">
@@ -331,17 +351,37 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         </label>
         <div className="section-label">{query ? '검색 결과' : 'NOTES'} <span>{query ? searchResults.length : entries.length}</span></div>
         <nav className="note-list" aria-label="노트 목록">
-          {(query ? searchResults : entries).map((entry) => (
-            <button
-              key={entry.path}
-              className={entry.path === activePath ? 'note-item active' : 'note-item'}
-              onClick={() => void selectNote(entry.path)}
-            >
-              <BookOpen size={15} />
-              <span>{'title' in entry ? entry.title : entry.name.replace(/\.md$/i, '')}</span>
-              <ChevronRight size={14} />
-            </button>
-          ))}
+          {query
+            ? searchResults.map((entry) => (
+                <button
+                  key={entry.path}
+                  className={entry.path === activePath ? 'note-item active' : 'note-item'}
+                  onClick={() => void selectNote(entry.path)}
+                >
+                  <BookOpen size={15} />
+                  <span>{entry.title}</span>
+                  <ChevronRight size={14} />
+                </button>
+              ))
+            : buildVaultTree(entries, folders).map((row) =>
+                row.kind === 'folder' ? (
+                  <div key={`folder:${row.path}`} className="folder-item" style={{ paddingLeft: 9 + row.depth * 14 }}>
+                    <Folder size={14} />
+                    <span>{row.name}</span>
+                  </div>
+                ) : (
+                  <button
+                    key={row.entry.path}
+                    className={row.entry.path === activePath ? 'note-item active' : 'note-item'}
+                    style={{ paddingLeft: 9 + row.depth * 14 }}
+                    onClick={() => void selectNote(row.entry.path)}
+                  >
+                    <BookOpen size={15} />
+                    <span>{row.entry.name.replace(/\.md$/i, '')}</span>
+                    <ChevronRight size={14} />
+                  </button>
+                ),
+              )}
         </nav>
         <div className="storage-note">
           <span className="status-dot" />

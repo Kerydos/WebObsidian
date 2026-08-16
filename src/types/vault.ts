@@ -12,11 +12,18 @@ export interface VaultDocument extends VaultEntry {
   revision: string;
 }
 
+export interface VaultFolderEntry {
+  path: string;
+  name: string;
+}
+
 export interface VaultRepository {
   readonly kind: VaultKind;
   readonly name: string;
   list(): Promise<VaultEntry[]>;
+  listFolders(): Promise<VaultFolderEntry[]>;
   read(path: string): Promise<VaultDocument>;
   write(path: string, content: string, expectedRevision?: string): Promise<VaultDocument>;
   create(path: string, content?: string): Promise<VaultDocument>;
+  createFolder(path: string): Promise<VaultFolderEntry>;
 }
