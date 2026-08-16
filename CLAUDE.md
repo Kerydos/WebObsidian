@@ -1,0 +1,189 @@
+# WebObsidian 프로젝트 인수인계
+
+이 문서는 현재까지 구현된 기능, 실행 방법, 주요 설계 결정과 후속 작업 시 주의사항을 정리한 프로젝트 안내서다. 실제 비밀번호, 세션 토큰 등 민감정보는 저장하지 않는다.
+
+## 현재 상태
+
+- 작업 브랜치: `agent/server-vault-auth`
+- 서버 파일 저장 및 로그인 기능 커밋: `80f9a43 Add authenticated server-backed vault`
+- 해당 커밋은 원격 브랜치에 푸시되어 있다.
+- 인플레이스 마크다운 라이브 프리뷰 변경은 현재 작업 트리에 있으며 아직 커밋되지 않았다.
+- `LIVE_PREVIEW_IMPLEMENTATION.md`는 사용자가 제공한 구현 참고 문서이므로 임의로 삭제하거나 덮어쓰지 않는다.
+
+## 아키텍처
+
+프로젝트는 모델 B 아키텍처를 사용한다.
+
+- 프론트엔드: React, TypeScript, Vite, CodeMirror 6
+- 백엔드: Node.js HTTP 서버
+- 데이터 원본: 서버의 실제 `.md` 파일
+- 브라우저 캐시 및 인덱스: Dexie/IndexedDB
+- 배포: Node 직접 실행 또는 Docker Compose
+
+백엔드는 빌드된 프론트엔드 정적 파일과 인증·Vault API를 함께 제공한다. 마크다운 문서는 `WEBOBSIDIAN_VAULT_DIR`로 지정한 서버 폴더에 저장하며, 기본값은 프로젝트의 `vault/` 폴더다.
+
+## 주요 파일
+
+- `server/server.mjs`: 정적 파일 및 HTTP API 서버
+- `server/auth.mjs`: 로그인, 세션, 로그아웃, 로그인 시도 제한
+- `server/vault.mjs`: 마크다운 파일 읽기·쓰기, 경로 검증, 충돌 감지
+- `src/lib/vault/server.ts`: 프론트엔드의 서버 Vault 저장소 어댑터
+- `src/lib/vault/localFs.ts`: Chromium 계열 브라우저의 로컬 폴더 연결 지원
+- `src/lib/vault/opfs.ts`: 기존 브라우저 OPFS 저장소 구현
+- `src/components/MarkdownEditor.tsx`: CodeMirror 편집기와 라이브 프리뷰 연결
+- `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현
+- `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트
+- `compose.yaml`, `Dockerfile`: 컨테이너 배포 설정
+
+## 개발 환경 실행
+
+Node.js 22.12 이상을 권장한다.
+
+```bash
+npm install
+WEBOBSIDIAN_PASSWORD='12자 이상의 개발용 비밀번호' npm run server:dev
+```
+
+다른 터미널에서 프론트엔드를 실행한다.
+
+```bash
+npm run dev
+```
+
+Vite가 표시하는 로컬 주소로 접속한다. 기본 개발 주소는 일반적으로 `http://127.0.0.1:5173/`이다. 로그인 아이디는 없으며, 서버 시작 시 `WEBOBSIDIAN_PASSWORD`로 지정한 단일 관리자 비밀번호만 입력한다.
+
+## 운영 배포
+
+### Node 직접 실행
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production \
+WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호' \
+WEBOBSIDIAN_VAULT_DIR=/srv/webobsidian/vault \
+HOST=127.0.0.1 \
+PORT=3000 \
+npm start
+```
+
+### Docker Compose
+
+```bash
+mkdir -p vault
+export WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호'
+docker compose up -d --build
+```
+
+현재 Compose 설정은 `127.0.0.1:3000`에 바인딩하고 호스트의 `./vault`를 컨테이너의 `/data/vault`에 연결한다. 외부 공개 시에는 Nginx, Caddy 같은 리버스 프록시에서 HTTPS를 종료하고 애플리케이션은 로컬 인터페이스에 유지한다.
+
+## 환경 변수
+
+- `WEBOBSIDIAN_PASSWORD`: 필수. 최소 12자 단일 관리자 비밀번호
+- `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
+- `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
+- `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
+- `HOST`: 서버 바인딩 주소
+- `PORT`: 서버 포트
+
+비밀번호나 세션 값은 저장소, 문서, Docker 이미지에 기록하지 않는다. 운영 환경에서는 환경 변수 또는 별도의 비밀 관리 시스템으로 주입한다.
+
+## 인증 동작
+
+- 별도 사용자 아이디 없이 비밀번호만 사용하는 단일 관리자 방식이다.
+- 로그인 성공 시 `HttpOnly`, `SameSite=Strict` 세션 쿠키를 발급한다.
+- `NODE_ENV=production` 또는 `WEBOBSIDIAN_SECURE_COOKIE=true`일 때 쿠키에 `Secure`가 적용된다.
+- 세션 유효기간은 7일이며 서버 메모리에 저장되므로 서버를 재시작하면 모든 세션이 만료된다.
+- 동일 클라이언트의 로그인 실패는 15분 동안 5회로 제한된다.
+- 인증되지 않은 Vault API 요청은 HTTP 401을 반환한다.
+
+주요 인증 API:
+
+- `GET /api/auth/session`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+
+## 서버 파일 저장 동작
+
+주요 Vault API:
+
+- `GET /api/health`
+- `GET /api/vault`
+- `GET /api/vault/file?path=...`
+- `PUT /api/vault/file?path=...`
+
+저장소 구현의 중요한 계약은 다음과 같다.
+
+- `.md` 파일만 관리한다.
+- 중첩 폴더를 지원한다.
+- 경로 이동 공격과 Vault 밖을 가리키는 심볼릭 링크를 차단한다.
+- 임시 파일 작성 후 이름 변경 방식으로 원자적으로 저장한다.
+- SHA-256 리비전을 비교하여 동시 수정 충돌을 감지한다.
+- 현재 쓰기 직렬화는 단일 Node 프로세스를 기준으로 한다. 여러 서버 인스턴스를 동시에 운영하려면 공유 잠금 또는 외부 저장 계층이 추가로 필요하다.
+
+## 인플레이스 마크다운 라이브 프리뷰
+
+편집기는 좌우 분할 미리보기를 사용하지 않는다. CodeMirror 편집 화면 안에서 마크다운을 즉시 시각화하며, 커서나 선택 영역이 요소에 닿으면 해당 원문 문법을 다시 보여 주어 편집할 수 있다.
+
+현재 지원 범위:
+
+- ATX 및 Setext 제목
+- 굵게, 기울임, 취소선, 인라인 코드
+- 순서·비순서 목록과 인용문
+- 클릭 가능한 작업 목록 체크박스
+- 일반 링크, 자동 링크, 참조 링크
+- 위키 링크 `[[문서|표시 이름]]`
+- 이미지
+- fenced 및 indented 코드 블록
+- GFM 표
+- 수평선
+- 링크 참조 정의 숨김
+
+상호작용 원칙:
+
+- 렌더링된 요소를 일반 클릭하면 원문 편집 상태로 돌아간다.
+- 링크와 위키 링크는 `Cmd` 또는 `Ctrl`을 누른 채 클릭하면 이동한다.
+- URL은 검사하며 `javascript:` 같은 위험한 스킴을 차단한다.
+- 블록 위젯은 완전한 줄 단위 범위에만 적용하여 CodeMirror 장식 중첩 오류를 방지한다.
+
+## 화면 설정
+
+상단 톱니바퀴 버튼에서 화면 설정 패널을 열 수 있다. 설정은 마크다운 파일이나 서버에 기록하지 않고 브라우저의 `localStorage`에 `webobsidian:appearance:v1` 키로 저장된다.
+
+- 종이, 밝게, 어둡게 테마
+- 본문 및 제목의 고딕·명조·고정폭 글꼴
+- 시스템 또는 Courier 코드 글꼴
+- 편안하게, 집중, 넓게 문서 레이아웃
+- 본문 크기, 줄 간격, 강조 색상
+- 즉시 반영, 기본값 복원, 새로고침 후 유지
+
+설정 스키마와 안전한 파싱은 `src/lib/settings/appearance.ts`, UI는 `src/components/AppearanceSettings.tsx`에 있다. 저장된 값이 손상되거나 지원 범위를 벗어나면 항목별 기본값 또는 허용 범위로 복구한다.
+
+## 검증
+
+변경 후 최소한 다음 명령을 실행한다.
+
+```bash
+npm test
+npm run build
+```
+
+마지막 확인 결과는 테스트 6개 파일, 총 27개 테스트 통과와 프로덕션 빌드 성공이다. 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. 현재 환경에서는 브라우저 런타임을 사용할 수 없어 실제 브라우저 기반 시각 QA는 수행하지 못했고, 단위 테스트·빌드·HTTP 모듈 응답으로 검증했다.
+
+## 알려진 제한사항
+
+- 수식(KaTeX), Mermaid, Obsidian callout, 임의의 raw HTML 렌더링은 지원하지 않는다.
+- 보안을 위해 raw HTML을 실행해서는 안 된다.
+- 표 위젯의 셀 내용은 현재 일반 텍스트이며 셀 내부 인라인 마크다운을 중첩 렌더링하지 않는다.
+- 코드 블록은 언어 이름만 표시하고 언어별 구문 강조는 제공하지 않는다.
+- 서버 Vault API는 `.md`만 제공하므로 Vault 내부 이미지 첨부 파일을 별도로 서비스하지 않는다. 상대 이미지 경로는 첨부 파일 제공 기능 없이는 정상 표시되지 않을 수 있다.
+- 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 명확한 서버 저장소 복귀 UI는 아직 없다.
+
+## 변경 시 주의사항
+
+- 데이터의 최종 원본은 브라우저 저장소가 아니라 서버의 실제 마크다운 파일이어야 한다.
+- `vault/`의 사용자 문서와 비밀번호 같은 비밀값을 Git에 커밋하지 않는다.
+- 사용자가 제공한 `LIVE_PREVIEW_IMPLEMENTATION.md`를 보존한다.
+- 기존 작업 트리에 사용자 변경이 있을 수 있으므로 관련 없는 파일을 되돌리지 않는다.
+- 라이브 프리뷰 수정 시 커서가 요소 안에 있을 때 원문이 노출되는지, 체크박스가 문서를 실제로 갱신하는지, 위험한 링크가 차단되는지를 함께 검증한다.
+- 서버 저장 로직 수정 시 경로 탈출, 심볼릭 링크, 리비전 충돌, 원자적 저장 테스트를 유지한다.

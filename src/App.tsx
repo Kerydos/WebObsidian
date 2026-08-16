@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   LogOut,
   Search,
+  Settings2,
   Sparkles,
 } from 'lucide-react';
 import type { VaultDocument, VaultEntry, VaultRepository } from './types/vault';
@@ -22,6 +23,8 @@ import { backlinksFor, indexMarkdown, resolveLink, type NoteIndex } from './lib/
 import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
 import { LoginScreen } from './components/LoginScreen';
+import { AppearanceSettingsPanel } from './components/AppearanceSettings';
+import { APPEARANCE_STORAGE_KEY, appearanceVariables, parseAppearance } from './lib/settings/appearance';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 
@@ -90,6 +93,14 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appearance, setAppearance] = useState(() => {
+    try {
+      return parseAppearance(window.localStorage.getItem(APPEARANCE_STORAGE_KEY));
+    } catch {
+      return parseAppearance(null);
+    }
+  });
   const activePathRef = useRef(activePath);
   const editorValueRef = useRef(editorValue);
   const documentsRef = useRef(documents);
@@ -98,6 +109,14 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   useEffect(() => void (activePathRef.current = activePath), [activePath]);
   useEffect(() => void (editorValueRef.current = editorValue), [editorValue]);
   useEffect(() => void (documentsRef.current = documents), [documents]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
+    } catch {
+      // The setting still applies for this session when browser storage is unavailable.
+    }
+  }, [appearance]);
 
   const notes = useMemo(
     () => [...documents.values()].map((document) => indexMarkdown(document.path, document.content)),
@@ -278,8 +297,10 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     }
   };
 
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={appearanceVariables(appearance)}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark"><Sparkles size={16} /></span>
@@ -293,6 +314,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             {saveState === 'error' ? <CircleAlert size={14} /> : null}
             {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
           </div>
+          <button className="topbar-button" onClick={() => setSettingsOpen(true)} title="화면 설정" aria-label="화면 설정 열기"><Settings2 size={16} /></button>
           <button className="logout-button" onClick={() => void logout()} title="로그아웃"><LogOut size={15} /> 로그아웃</button>
         </div>
       </header>
@@ -332,7 +354,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : activePath ? (
           <Suspense fallback={<div className="center-state"><LoaderCircle className="spin" /></div>}>
-            <MarkdownEditor key={activePath} value={editorValue} onChange={setEditorValue} />
+            <MarkdownEditor key={activePath} value={editorValue} onChange={setEditorValue} onNavigateWikiLink={navigateLink} />
           </Suspense>
         ) : (
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
@@ -375,6 +397,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       {error ? (
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{error}</span><button onClick={() => setError(undefined)}>닫기</button></div>
       ) : null}
+      {settingsOpen ? <AppearanceSettingsPanel settings={appearance} onChange={setAppearance} onClose={closeSettings} /> : null}
     </div>
   );
 }
