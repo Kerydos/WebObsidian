@@ -59,6 +59,10 @@ export class ServerVaultRepository implements VaultRepository {
     await request(fileUrl(path), { method: 'DELETE' });
   }
 
+  async removeFolder(path: string): Promise<void> {
+    await request(`/api/vault/folder?path=${encodeURIComponent(normalizeVaultPath(path))}`, { method: 'DELETE' });
+  }
+
   rename(path: string, newPath: string): Promise<VaultDocument> {
     return request(fileUrl(path), {
       method: 'PATCH',
@@ -74,4 +78,62 @@ export class ServerVaultRepository implements VaultRepository {
       body: JSON.stringify({ newPath: normalizeVaultPath(newPath) }),
     });
   }
+}
+
+export type VaultChangeEvent = {
+  type: 'note' | 'vault';
+  action: 'upsert' | 'delete' | 'move' | 'reload';
+  path?: string;
+  newPath?: string;
+  revision?: string;
+};
+
+// 서버 볼트의 변경 이벤트 스트림(SSE)을 구독한다. 연결이 끊기면 브라우저가 자동으로 재시도하고,
+// 세션 만료 등으로 스트림이 닫히면 세션을 확인한 뒤 재연결하거나 로그인 화면으로 보낸다.
+export function subscribeVaultChanges(onChange: (event: VaultChangeEvent) => void): () => void {
+  let source: EventSource | null = null;
+  let reconnectTimer: number | null = null;
+  let closed = false;
+
+  const reconnect = () => {
+    if (closed || reconnectTimer !== null) return;
+    reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = null;
+      open();
+    }, 5000);
+  };
+
+  const open = () => {
+    source = new EventSource('/api/vault/events');
+    source.onmessage = (message) => {
+      try {
+        onChange(JSON.parse(message.data) as VaultChangeEvent);
+      } catch {
+        // 잘못된 이벤트 페이로드는 무시한다.
+      }
+    };
+    source.onerror = () => {
+      if (closed || !source || source.readyState !== EventSource.CLOSED) return;
+      source.close();
+      source = null;
+      void fetch('/api/auth/session')
+        .then(async (response) => {
+          if (!response.ok) throw new Error('session check failed');
+          const body = await response.json() as { authenticated: boolean };
+          if (!body.authenticated) {
+            window.dispatchEvent(new Event('webobsidian:unauthorized'));
+            return;
+          }
+          reconnect();
+        })
+        .catch(() => reconnect());
+    };
+  };
+
+  open();
+  return () => {
+    closed = true;
+    if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+    source?.close();
+  };
 }

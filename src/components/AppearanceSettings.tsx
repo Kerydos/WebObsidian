@@ -1,7 +1,5 @@
-import { useEffect, useId } from 'react';
-import { Palette, RotateCcw, SlidersHorizontal, Type, X } from 'lucide-react';
+import { Palette, SlidersHorizontal, Type } from 'lucide-react';
 import {
-  defaultAppearance,
   type AppearanceSettings,
   type CodeFontChoice,
   type ColorTheme,
@@ -9,10 +7,9 @@ import {
   type FontChoice,
 } from '../lib/settings/appearance';
 
-interface AppearanceSettingsProps {
+interface AppearanceSettingsSectionProps {
   settings: AppearanceSettings;
   onChange: (settings: AppearanceSettings) => void;
-  onClose: () => void;
 }
 
 const themeOptions: Array<{ value: ColorTheme; label: string; description: string }> = [
@@ -21,35 +18,14 @@ const themeOptions: Array<{ value: ColorTheme; label: string; description: strin
   { value: 'dark', label: '어둡게', description: '낮은 조도의 작업 환경' },
 ];
 
-export function AppearanceSettingsPanel({ settings, onChange, onClose }: AppearanceSettingsProps) {
-  const titleId = useId();
+export function AppearanceSettingsSection({ settings, onChange }: AppearanceSettingsSectionProps) {
   const update = <Key extends keyof AppearanceSettings,>(key: Key, value: AppearanceSettings[Key]) => {
     onChange({ ...settings, [key]: value });
   };
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
-
   return (
-    <div className="settings-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <section className="settings-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <header className="settings-heading">
-          <div>
-            <span>APPEARANCE</span>
-            <h2 id={titleId}>화면 설정</h2>
-          </div>
-          <button type="button" className="settings-close" onClick={onClose} aria-label="설정 닫기"><X size={19} /></button>
-        </header>
-
-        <div className="settings-content">
-          <fieldset className="settings-section">
+    <>
+      <fieldset className="settings-section">
             <legend><Palette size={16} /> 테마</legend>
             <div className="theme-options">
               {themeOptions.map((option) => (
@@ -124,13 +100,6 @@ export function AppearanceSettingsPanel({ settings, onChange, onClose }: Appeara
               </span>
             </label>
           </fieldset>
-        </div>
-
-        <footer className="settings-footer">
-          <button type="button" onClick={() => onChange(defaultAppearance)}><RotateCcw size={15} /> 기본값 복원</button>
-          <button type="button" className="settings-done" onClick={onClose}>완료</button>
-        </footer>
-      </section>
-    </div>
+    </>
   );
 }

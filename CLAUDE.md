@@ -30,10 +30,16 @@
 - `server/server.mjs`: 정적 파일 및 HTTP API 서버
 - `server/auth.mjs`: 로그인, 세션, 로그아웃, 로그인 시도 제한
 - `server/vault.mjs`: 마크다운 파일 읽기·쓰기, 경로 검증, 충돌 감지
+- `server/ollama.mjs`: Ollama Cloud API 프록시(모델 목록, 스트리밍 채팅)와 서버 측 공유 설정 저장소
 - `src/lib/vault/server.ts`: 프론트엔드의 서버 Vault 저장소 어댑터
 - `src/lib/vault/localFs.ts`: Chromium 계열 브라우저의 로컬 폴더 연결 지원
 - `src/lib/vault/opfs.ts`: 기존 브라우저 OPFS 저장소 구현
+- `src/lib/settings/ollama.ts`: 과거 localStorage 저장 설정의 마이그레이션 헬퍼
+- `src/lib/ai/ollamaCloud.ts`: Ollama Cloud 클라이언트(공유 설정 조회·저장, 모델 목록, NDJSON 스트리밍 채팅)
 - `src/components/MarkdownEditor.tsx`: CodeMirror 편집기와 라이브 프리뷰 연결
+- `src/components/SettingsPanel.tsx`: 탭 구조 설정 창(화면 / Ollama Cloud)
+- `src/components/OllamaSettings.tsx`: API 키 입력과 모델 선택 설정 화면
+- `src/components/AssistantPanel.tsx`: Ollama Cloud 기반 AI 도우미 패널
 - `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현(콜아웃, 프론트매터, 표 셀 인라인 렌더링 포함)
 - `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵
 - `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
@@ -87,6 +93,8 @@ docker compose up -d --build
 - `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
 - `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
 - `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
+- `WEBOBSIDIAN_OLLAMA_HOST`: 선택. Ollama Cloud 프록시의 업스트림 주소(기본값 `https://ollama.com`)
+- `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`: 선택. Ollama Cloud 공유 설정(API 키, 모델) 파일 경로(기본값 vault 안의 `.webobsidian-ollama.json`)
 - `HOST`: 서버 바인딩 주소
 - `PORT`: 서버 포트
 
@@ -157,9 +165,13 @@ docker compose up -d --build
 
 형광펜과 콜아웃은 표준 Markdown/GFM에 없는 Obsidian 확장 문법이므로, `src/components/editor/markdownExtensions.ts`에 커스텀 `@lezer/markdown` 확장(`Highlight`)과 `src/components/editor/livePreview.ts`의 블록쿼트 첫 줄 패턴 매칭(콜아웃)으로 직접 구현했다. 표 셀 내부 렌더링은 셀 텍스트를 별도의 작은 Markdown 파서 인스턴스로 다시 파싱해 DOM을 구성하며(`renderInlineMarkdown`), CodeMirror 데코레이션과는 무관하게 정적 HTML만 생성하므로 셀 안에서 직접 편집할 수는 없다(테이블 위젯 전체를 클릭하면 원문 편집 모드로 전환된다).
 
-## 화면 설정
+## 설정 창
 
-상단 톱니바퀴 버튼에서 화면 설정 패널을 열 수 있다. 설정은 마크다운 파일이나 서버에 기록하지 않고 브라우저의 `localStorage`에 `webobsidian:appearance:v1` 키로 저장된다.
+상단 톱니바퀴 버튼에서 설정 창을 열 수 있다. 설정 창은 '화면'과 'Ollama Cloud' 두 개 탭으로 구성된다(`src/components/SettingsPanel.tsx`). 모든 설정은 마크다운 파일이나 서버에 기록하지 않고 브라우저의 `localStorage`에 저장된다.
+
+### 화면 탭
+
+`webobsidian:appearance:v1` 키에 저장된다.
 
 - 종이, 밝게, 어둡게 테마
 - 본문 및 제목의 고딕·명조·고정폭 글꼴
@@ -170,6 +182,42 @@ docker compose up -d --build
 
 설정 스키마와 안전한 파싱은 `src/lib/settings/appearance.ts`, UI는 `src/components/AppearanceSettings.tsx`에 있다. 저장된 값이 손상되거나 지원 범위를 벗어나면 항목별 기본값 또는 허용 범위로 복구한다.
 
+## Ollama Cloud 연동
+
+ollama.com의 클라우드 모델(gpt-oss:120b, qwen3.5 등)을 사용하는 AI 도우미 기능이다.
+
+### 설정 저장 위치(서버 공유)
+
+- API 키와 모델은 **서버**에 저장되며 로그인한 모든 브라우저에서 함께 사용된다.
+- 저장 파일은 `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`로 변경할 수 있고 기본값은 vault 폴더 안의 `.webobsidian-ollama.json`이다(0600 권한, JSON). 이 파일은 `.md`가 아니므로 노트 목록·vault API·파일 워처 어디에도 노출되지 않고, `/vault/`가 gitignore되어 있어 커밋되지도 않는다. Docker에서 vault 볼륨에 포함되므로 컨테이너 재생성 후에도 유지된다.
+- 설정 조회는 키 원문을 돌려주지 않고 `{ hasApiKey, apiKeyHint(마스킹), model }` 뷰만 제공한다.
+- 과거 버전이 브라우저 localStorage(`webobsidian:ollama:v1`)에 저장하던 키는 앱 시작 시 서버에 키가 없으면 자동으로 서버로 이전된 뒤 삭제한다(`src/lib/settings/ollama.ts` 참고).
+
+### 설정 창(Ollama Cloud 탭)
+
+- API 키 입력 후 '저장' 버튼으로 서버에 저장한다. 표시/숨김 토글, 저장된 키 삭제(교체는 새 키 저장)를 지원한다.
+- 모델 선택: '모델 목록 불러오기' 버튼으로 계정의 클라우드 모델 목록을 가져와 선택하거나, 이름을 직접 입력할 수 있다(직접 입력은 0.6초 후 자동 저장). 모델도 서버에 저장되어 모든 브라우저에 적용된다.
+
+### 동작 구조
+
+- 브라우저는 직접 ollama.com에 접속하지 않고 같은 서버의 프록시를 사용한다(CORS·키 노출 회피).
+  - `GET /api/ollama/settings` / `PUT /api/ollama/settings` — 공유 설정 조회·수정(로그인 필요)
+  - `GET /api/ollama/tags` → `https://ollama.com/api/tags`(모델 목록)
+  - `POST /api/ollama/chat` → `https://ollama.com/api/chat`(채팅, `stream: true`면 NDJSON 그대로 전달)
+- 모든 `/api/ollama/*` 엔드포인트는 로그인 세션이 필요하다(`/api/vault`와 동일 정책). 프록시는 서버에 저장된 API 키를 사용하되, 요청의 `Authorization: Bearer` 헤더로 직접 전달된 키가 있으면 그것을 우선한다.
+- 채팅 요청은 `model`, `messages`, `stream` 필드만 허용 목록으로 전달한다(`sanitizeChatRequest`). 업스트림 401/403/404/429는 같은 상태 코드로, 그 외는 502로 매핑하고 업스트림 오류 메시지를 그대로 보여 준다. 키가 어디에도 없으면 401('저장된 Ollama Cloud API 키가 없습니다')을 반환하며, 이 401은 세션 만료 401과 구분해 로그아웃 처리하지 않는다.
+- 업스트림 주소는 `WEBOBSIDIAN_OLLAMA_HOST`로 바꿀 수 있다(기본 `https://ollama.com`, 테스트용).
+- 구현은 `server/ollama.mjs`(프록시 + `OllamaSettingsStore`)와 `src/lib/ai/ollamaCloud.ts`(클라이언트)에 있다.
+
+### AI 도우미 패널
+
+상단 봇 버튼으로 열고 닫는다(`src/components/AssistantPanel.tsx`).
+
+- 서버에 저장된 모델과 대화하며 응답이 스트리밍으로 표시된다. Enter 전송, Shift+Enter 줄바꿈, 생성 중 '중지' 가능.
+- '현재 노트 참조'를 켜면 열려 있는 노트 제목과 내용(최대 8000자)을 맥락으로 함께 보낸다.
+- 어시스턴트 답변은 '노트에 삽입'(현재 노트 끝에 추가, 기존 자동 저장 흐름을 따름)하거나 '복사'할 수 있다.
+- 대화 상태는 메모리에만 유지되며 패널을 닫아도 유지되고, 새로고침하면 사라진다.
+
 ## 검증
 
 변경 후 최소한 다음 명령을 실행한다.
@@ -179,7 +227,7 @@ npm test
 npm run build
 ```
 
-마지막 확인 결과는 테스트 7개 파일, 총 53개 테스트 통과와 프로덕션 빌드 성공이다. 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
+마지막 확인 결과는 테스트 11개 파일, 총 93개 테스트 통과와 프로덕션 빌드 성공이다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 

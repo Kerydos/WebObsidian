@@ -4,20 +4,25 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
 import { livePreview } from './editor/livePreview';
 import { Highlight, listIndentKeymap } from './editor/markdownExtensions';
+import { paragraphCommitListener } from './editor/paragraphCommit';
 
 interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   onNavigateWikiLink?: (target: string) => void;
+  onParagraphCommitted?: (paragraph: string) => void;
 }
 
-export default function MarkdownEditor({ value, onChange, onNavigateWikiLink }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, onChange, onNavigateWikiLink, onParagraphCommitted }: MarkdownEditorProps) {
   const navigateRef = useRef(onNavigateWikiLink);
   navigateRef.current = onNavigateWikiLink;
+  const paragraphCommittedRef = useRef(onParagraphCommitted);
+  paragraphCommittedRef.current = onParagraphCommitted;
   const extensions = useMemo(
     () => [
       markdown({ base: markdownLanguage, extensions: Highlight }),
       livePreview((target) => navigateRef.current?.(target)),
+      paragraphCommitListener((paragraph) => paragraphCommittedRef.current?.(paragraph)),
       keymap.of(listIndentKeymap),
       EditorView.lineWrapping,
       EditorView.theme({

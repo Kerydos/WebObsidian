@@ -27,6 +27,7 @@ export interface VaultRepository {
   create(path: string, content?: string): Promise<VaultDocument>;
   createFolder(path: string): Promise<VaultFolderEntry>;
   remove(path: string): Promise<void>;
+  removeFolder(path: string): Promise<void>;
   rename(path: string, newPath: string): Promise<VaultDocument>;
   renameFolder(path: string, newPath: string): Promise<VaultFolderEntry>;
 }

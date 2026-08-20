@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
+  Bot,
   Check,
   ChevronRight,
   CircleAlert,
@@ -19,7 +20,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from './types/vault';
-import { ServerVaultRepository } from './lib/vault/server';
+import { ServerVaultRepository, subscribeVaultChanges } from './lib/vault/server';
 import { LocalFsVaultRepository } from './lib/vault/localFs';
 import { ensureMarkdownPath, normalizeVaultPath } from './lib/vault/path';
 import { buildVaultTree } from './lib/vault/tree';
@@ -28,8 +29,15 @@ import { VaultSearchIndex } from './lib/search/searchIndex';
 import { db } from './lib/cache/database';
 import { LoginScreen } from './components/LoginScreen';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { AppearanceSettingsPanel } from './components/AppearanceSettings';
+import { SettingsPanel, type SettingsTab } from './components/SettingsPanel';
+import { AssistantPanel } from './components/AssistantPanel';
+import { GrammarCheckPanel, type GrammarCheckResult } from './components/GrammarCheckPanel';
 import { APPEARANCE_STORAGE_KEY, appearanceVariables, parseAppearance } from './lib/settings/appearance';
+import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/settings/ollama';
+import { checkGrammar, emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
+
+const GRAMMAR_CHECK_STORAGE_KEY = 'webobsidian:grammarcheck:v1';
+const maxGrammarResults = 20;
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 
@@ -65,6 +73,12 @@ function uniqueBaseName(taken: Set<string>, base: string, suffix: string) {
 function parentOf(path: string) {
   const separator = path.lastIndexOf('/');
   return separator === -1 ? '' : path.slice(0, separator);
+}
+
+function dailyNoteBaseName(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}${day}_기록`;
 }
 
 type RenameTarget = { kind: 'note'; path: string } | { kind: 'folder'; path: string };
@@ -118,7 +132,9 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [renaming, setRenaming] = useState<RenameTarget | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<string | null>(null);
   const cancelRenameRef = useRef(false);
   const [appearance, setAppearance] = useState(() => {
     try {
@@ -127,6 +143,22 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       return parseAppearance(null);
     }
   });
+  const [ollama, setOllama] = useState<OllamaServerSettings>(emptyOllamaServerSettings);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('appearance');
+  const [grammarEnabled, setGrammarEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem(GRAMMAR_CHECK_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [grammarResults, setGrammarResults] = useState<GrammarCheckResult[]>([]);
+  const [grammarChecking, setGrammarChecking] = useState(false);
+  const [grammarError, setGrammarError] = useState<string>();
+  const grammarAbortRef = useRef<AbortController | null>(null);
+  const lastGrammarTextRef = useRef('');
+  const grammarResultIdRef = useRef(0);
   const activePathRef = useRef(activePath);
   const editorValueRef = useRef(editorValue);
   const documentsRef = useRef(documents);
@@ -143,6 +175,48 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       // The setting still applies for this session when browser storage is unavailable.
     }
   }, [appearance]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GRAMMAR_CHECK_STORAGE_KEY, grammarEnabled ? '1' : '0');
+    } catch {
+      // The setting still applies for this session when browser storage is unavailable.
+    }
+  }, [grammarEnabled]);
+
+  // 노트를 전환하면 이전 노트에 대한 검사 결과와 중복 방지 기록을 비운다.
+  useEffect(() => {
+    grammarAbortRef.current?.abort();
+    lastGrammarTextRef.current = '';
+    setGrammarResults([]);
+    setGrammarChecking(false);
+    setGrammarError(undefined);
+  }, [activePath]);
+
+  // 서버에 저장된 Ollama Cloud 설정을 불러온다. 과거 버전이 이 브라우저에 저장해 둔 키가
+  // 있고 서버에 아직 키가 없으면 한 번만 서버로 이전해 모든 브라우저가 공유하게 한다.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        let settings = await fetchOllamaSettings();
+        const legacy = readLegacyOllamaSettings();
+        if (legacy.apiKey && !settings.hasApiKey) {
+          settings = await saveOllamaSettings({
+            apiKey: legacy.apiKey,
+            ...(settings.model ? {} : legacy.model ? { model: legacy.model } : {}),
+          });
+        }
+        if (legacy.apiKey) clearLegacyOllamaSettings();
+        if (!cancelled) setOllama(settings);
+      } catch {
+        // 설정 로드에 실패하면 미설정 상태를 유지한다(패널이 안내를 표시).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const notes = useMemo(
     () => [...documents.values()].map((document) => indexMarkdown(document.path, document.content)),
@@ -283,6 +357,116 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     [saveActive],
   );
 
+  const reloadTimerRef = useRef<number | null>(null);
+  const reloadRunningRef = useRef(false);
+  const reloadPendingRef = useRef(false);
+
+  // 다른 브라우저/외부 변경으로 구조(폴더)가 바뀐 경우: 보류 중인 저장을 마친 뒤 조용히 전체를 다시 불러온다.
+  const scheduleReload = useCallback((delay = 300) => {
+    if (reloadTimerRef.current !== null) return;
+    reloadTimerRef.current = window.setTimeout(() => {
+      reloadTimerRef.current = null;
+      if (reloadRunningRef.current) {
+        reloadPendingRef.current = true;
+        return;
+      }
+      reloadRunningRef.current = true;
+      void (async () => {
+        try {
+          await saveActive();
+          await loadRepository(repository, { preferredActivePath: activePathRef.current, silent: true });
+        } finally {
+          reloadRunningRef.current = false;
+          if (reloadPendingRef.current) {
+            reloadPendingRef.current = false;
+            scheduleReload(0);
+          }
+        }
+      })();
+    }, delay);
+  }, [loadRepository, repository, saveActive]);
+
+  const handleNoteUpsert = useCallback(async (path: string, revision?: string) => {
+    const known = documentsRef.current.get(path);
+    if (known && revision && known.revision === revision) return;
+    // 편집 중인 노트는 로컬 리비전을 유지해 저장 시 서버 충돌(409)이 감지되도록 한다.
+    if (known && activePathRef.current === path && editorValueRef.current !== known.content) return;
+    let fresh: VaultDocument;
+    try {
+      fresh = await repository.read(path);
+    } catch {
+      return;
+    }
+    if (documentsRef.current.get(path)?.revision === fresh.revision) return;
+    const previous = documentsRef.current.get(path);
+    if (previous && activePathRef.current === path && editorValueRef.current !== previous.content) return;
+    setDocuments((current) => new Map(current).set(path, fresh));
+    setEntries((current) => [...current.filter((entry) => entry.path !== path), fresh].sort((a, b) => a.path.localeCompare(b.path)));
+    void db.notes.put({ vault: repository.name, path, modifiedAt: fresh.modifiedAt, content: fresh.content });
+    if (activePathRef.current === path && (!previous || previous.content === editorValueRef.current)) {
+      setEditorValue(fresh.content);
+      setSaveState('saved');
+    }
+  }, [repository]);
+
+  const handleNoteDelete = useCallback((path: string) => {
+    if (!documentsRef.current.has(path)) return;
+    setEntries((current) => current.filter((entry) => entry.path !== path));
+    setDocuments((current) => {
+      const next = new Map(current);
+      next.delete(path);
+      return next;
+    });
+    void db.notes.delete([repository.name, path]);
+    if (activePathRef.current === path) {
+      const nextPath = [...documentsRef.current.keys()].filter((candidate) => candidate !== path).sort((a, b) => a.localeCompare(b))[0];
+      setActivePath(nextPath);
+      setEditorValue(nextPath ? documentsRef.current.get(nextPath)?.content ?? '' : '');
+      setSaveState('saved');
+    }
+  }, [repository]);
+
+  const handleNoteMove = useCallback((path: string, newPath: string) => {
+    const existing = documentsRef.current.get(path);
+    if (!existing) {
+      scheduleReload();
+      return;
+    }
+    const moved: VaultDocument = { ...existing, path: newPath, name: newPath.split('/').at(-1) ?? newPath };
+    setEntries((current) => current.map((entry) => (entry.path === path ? moved : entry)).sort((a, b) => a.path.localeCompare(b.path)));
+    setDocuments((current) => {
+      const next = new Map(current);
+      next.delete(path);
+      next.set(newPath, moved);
+      return next;
+    });
+    void (async () => {
+      await db.notes.delete([repository.name, path]);
+      await db.notes.put({ vault: repository.name, path: newPath, modifiedAt: moved.modifiedAt, content: moved.content });
+    })();
+    if (activePathRef.current === path) setActivePath(newPath);
+  }, [repository, scheduleReload]);
+
+  // 서버 볼트 변경 이벤트(SSE)를 구독해 다른 브라우저·외부 변경을 화면에 반영한다.
+  useEffect(() => {
+    if (repository.kind !== 'server') return;
+    return subscribeVaultChanges((event) => {
+      if (event.type === 'note' && event.action === 'upsert' && event.path) {
+        void handleNoteUpsert(event.path, event.revision);
+        return;
+      }
+      if (event.type === 'note' && event.action === 'delete' && event.path) {
+        handleNoteDelete(event.path);
+        return;
+      }
+      if (event.type === 'note' && event.action === 'move' && event.path && event.newPath) {
+        handleNoteMove(event.path, event.newPath);
+        return;
+      }
+      scheduleReload();
+    });
+  }, [repository, handleNoteUpsert, handleNoteDelete, handleNoteMove, scheduleReload]);
+
   const openLocalFolder = async () => {
     if (!window.showDirectoryPicker) {
       setError('이 브라우저는 로컬 폴더 열기를 지원하지 않습니다. Browser Vault를 이용해 주세요.');
@@ -310,8 +494,13 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const createNote = async () => {
     try {
       await saveActive();
-      const base = uniqueBaseName(new Set(entries.map((entry) => entry.path)), '무제', '.md');
-      const path = `${base}.md`;
+      const folder = folders.some((item) => item.path === selectedFolder) ? selectedFolder : null;
+      const prefix = folder ? `${folder}/` : '';
+      const taken = new Set(
+        entries.filter((entry) => entry.path.startsWith(prefix)).map((entry) => entry.path.slice(prefix.length)),
+      );
+      const base = uniqueBaseName(taken, dailyNoteBaseName(), '.md');
+      const path = `${prefix}${base}.md`;
       const created = await repository.create(path, `# ${base}\n\n`);
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
@@ -367,6 +556,12 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       if (folders.some((folder) => folder.path === newPath)) throw new Error('같은 이름의 폴더가 이미 있습니다.');
       await saveActive();
       await repository.renameFolder(path, newPath);
+      setSelectedFolder((current) => {
+        if (!current) return current;
+        if (current === path) return newPath;
+        if (current.startsWith(`${path}/`)) return `${newPath}${current.slice(path.length)}`;
+        return current;
+      });
       const current = activePathRef.current;
       const prefix = `${path}/`;
       const preferredActivePath = current?.startsWith(prefix) ? `${newPath}${current.slice(path.length)}` : current;
@@ -450,6 +645,35 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     }
   };
 
+  const confirmDeleteFolder = async () => {
+    const folderPath = deleteFolderTarget;
+    setDeleteFolderTarget(null);
+    if (!folderPath) return;
+    const prefix = `${folderPath}/`;
+    try {
+      await repository.removeFolder(folderPath);
+      const removedPaths = new Set(entries.filter((entry) => entry.path.startsWith(prefix)).map((entry) => entry.path));
+      setEntries((previous) => previous.filter((entry) => !removedPaths.has(entry.path)));
+      setFolders((previous) => previous.filter((folder) => folder.path !== folderPath && !folder.path.startsWith(prefix)));
+      setDocuments((previous) => {
+        const next = new Map(previous);
+        for (const path of removedPaths) next.delete(path);
+        return next;
+      });
+      await Promise.all([...removedPaths].map((path) => db.notes.delete([repository.name, path])));
+      setSelectedFolder((current) => (current && (current === folderPath || current.startsWith(prefix)) ? null : current));
+      if (activePathRef.current && removedPaths.has(activePathRef.current)) {
+        const remaining = entries.filter((entry) => !removedPaths.has(entry.path));
+        const nextPath = remaining[0]?.path;
+        setActivePath(nextPath);
+        setEditorValue(nextPath ? documentsRef.current.get(nextPath)?.content ?? '' : '');
+        setSaveState('saved');
+      }
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
   const navigateLink = (target: string) => {
     const resolved = resolveLink(target, entries.map((entry) => entry.path));
     if (resolved) void selectNote(resolved);
@@ -466,6 +690,52 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   };
 
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openSettings = useCallback((tab: SettingsTab = 'appearance') => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, []);
+
+  // AI 도우미 답변을 현재 노트 끝에 추가한다. 편집 내용은 기존 자동 저장 흐름을 따른다.
+  const insertAssistantText = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const current = editorValueRef.current;
+    setEditorValue(current.trim() ? `${current}\n\n${trimmed}\n` : `${trimmed}\n`);
+  }, []);
+
+  const grammarConfigured = ollama.hasApiKey && ollama.model !== '';
+
+  // Enter로 문단을 마칠 때마다 직전 문단을 서버의 Ollama Cloud 모델로 검사한다.
+  // 진행 중이던 검사는 새 문단이 들어오면 취소하고 최신 요청만 반영한다.
+  const handleParagraphCommitted = useCallback((paragraph: string) => {
+    if (!grammarEnabled || !grammarConfigured) return;
+    if (paragraph === lastGrammarTextRef.current) return;
+    lastGrammarTextRef.current = paragraph;
+    grammarAbortRef.current?.abort();
+    const controller = new AbortController();
+    grammarAbortRef.current = controller;
+    setGrammarError(undefined);
+    setGrammarChecking(true);
+    void checkGrammar({ model: ollama.model, text: paragraph, signal: controller.signal })
+      .then((issues) => {
+        if (controller.signal.aborted) return;
+        grammarResultIdRef.current += 1;
+        setGrammarResults((current) => [
+          { id: grammarResultIdRef.current, paragraph, issues },
+          ...current,
+        ].slice(0, maxGrammarResults));
+      })
+      .catch((cause) => {
+        if (controller.signal.aborted) return;
+        setGrammarError(messageOf(cause));
+      })
+      .finally(() => {
+        if (grammarAbortRef.current === controller) {
+          grammarAbortRef.current = null;
+          setGrammarChecking(false);
+        }
+      });
+  }, [grammarEnabled, grammarConfigured, ollama.model]);
 
   return (
     <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={appearanceVariables(appearance)}>
@@ -482,7 +752,16 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             {saveState === 'error' ? <CircleAlert size={14} /> : null}
             {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
           </div>
-          <button className="topbar-button" onClick={() => setSettingsOpen(true)} title="화면 설정" aria-label="화면 설정 열기"><Settings2 size={16} /></button>
+          <button
+            className={assistantOpen ? 'topbar-button active' : 'topbar-button'}
+            onClick={() => setAssistantOpen((open) => !open)}
+            title="AI 도우미"
+            aria-label="AI 도우미 열기"
+            aria-pressed={assistantOpen}
+          >
+            <Bot size={16} />
+          </button>
+          <button className="topbar-button" onClick={() => openSettings()} title="설정" aria-label="설정 열기"><Settings2 size={16} /></button>
           <button className="logout-button" onClick={() => void logout()} title="로그아웃"><LogOut size={15} /> 로그아웃</button>
         </div>
       </header>
@@ -519,7 +798,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                     className={entry.path === activePath ? 'note-item active' : 'note-item'}
                     onClick={() => void selectNote(entry.path)}
                   >
-                    <BookOpen size={15} />
                     <span>{entry.title}</span>
                     <ChevronRight size={14} />
                   </button>
@@ -540,32 +818,55 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 if (row.kind === 'folder') {
                   const isRenaming = renaming?.kind === 'folder' && renaming.path === row.path;
                   return (
-                    <div
-                      key={`folder:${row.path}`}
-                      className={dragOverTarget === row.path ? 'folder-item drop-target' : 'folder-item'}
-                      style={{ paddingLeft: 9 + row.depth * 14 }}
-                      onDragOver={(event) => { event.preventDefault(); setDragOverTarget(row.path); }}
-                      onDragLeave={() => setDragOverTarget((current) => (current === row.path ? null : current))}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        setDragOverTarget(null);
-                        const draggedPath = event.dataTransfer.getData('text/webobsidian-path');
-                        if (draggedPath) void moveIntoFolder(draggedPath, row.path);
-                      }}
-                    >
-                      <Folder size={14} />
-                      {isRenaming ? (
-                        <input
-                          className="rename-input"
-                          autoFocus
-                          value={renameValue}
-                          onChange={(event) => setRenameValue(event.target.value)}
-                          onKeyDown={handleRenameKeyDown}
-                          onBlur={handleRenameBlur}
-                        />
-                      ) : (
-                        <span onDoubleClick={() => startRenameFolder(row.path)}>{row.name}</span>
-                      )}
+                    <div key={`folder:${row.path}`} className="folder-row">
+                      <div
+                        className={[
+                          'folder-item',
+                          selectedFolder === row.path ? 'selected' : '',
+                          dragOverTarget === row.path ? 'drop-target' : '',
+                        ].filter(Boolean).join(' ')}
+                        style={{ paddingLeft: 9 + row.depth * 14 }}
+                        onClick={
+                          isRenaming
+                            ? undefined
+                            : () => setSelectedFolder((current) => (current === row.path ? null : row.path))
+                        }
+                        onDragOver={(event) => { event.preventDefault(); setDragOverTarget(row.path); }}
+                        onDragLeave={() => setDragOverTarget((current) => (current === row.path ? null : current))}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setDragOverTarget(null);
+                          const draggedPath = event.dataTransfer.getData('text/webobsidian-path');
+                          if (draggedPath) void moveIntoFolder(draggedPath, row.path);
+                        }}
+                      >
+                        <Folder size={14} />
+                        {isRenaming ? (
+                          <input
+                            className="rename-input"
+                            autoFocus
+                            value={renameValue}
+                            onChange={(event) => setRenameValue(event.target.value)}
+                            onKeyDown={handleRenameKeyDown}
+                            onBlur={handleRenameBlur}
+                          />
+                        ) : (
+                          <span onDoubleClick={() => startRenameFolder(row.path)}>{row.name}</span>
+                        )}
+                      </div>
+                      {!isRenaming ? (
+                        <button
+                          className="folder-delete"
+                          title="폴더 삭제"
+                          aria-label={`${row.name} 폴더 삭제`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteFolderTarget(row.path);
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      ) : null}
                     </div>
                   );
                 }
@@ -583,7 +884,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                   >
                     {isRenaming ? (
                       <div className="note-item renaming" style={{ paddingLeft: 9 + row.depth * 14 }}>
-                        <BookOpen size={15} />
                         <input
                           className="rename-input"
                           autoFocus
@@ -604,7 +904,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                             startRenameNote(row.entry.path);
                           }}
                         >
-                          <BookOpen size={15} />
                           <span>{row.entry.name.replace(/\.md$/i, '')}</span>
                           <ChevronRight size={14} />
                         </button>
@@ -636,7 +935,13 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : activePath ? (
           <Suspense fallback={<div className="center-state"><LoaderCircle className="spin" /></div>}>
-            <MarkdownEditor key={activePath} value={editorValue} onChange={setEditorValue} onNavigateWikiLink={navigateLink} />
+            <MarkdownEditor
+              key={activePath}
+              value={editorValue}
+              onChange={setEditorValue}
+              onNavigateWikiLink={navigateLink}
+              onParagraphCommitted={handleParagraphCommitted}
+            />
           </Suspense>
         ) : (
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
@@ -674,12 +979,38 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             {activeNote?.tags.map((tag) => <button key={tag} onClick={() => setQuery(tag)}><Hash size={12} />{tag.slice(1)}</button>)}
           </div>
         </section>
+        <GrammarCheckPanel
+          enabled={grammarEnabled}
+          onToggle={setGrammarEnabled}
+          configured={grammarConfigured}
+          checking={grammarChecking}
+          error={grammarError}
+          results={grammarResults}
+        />
       </aside>
 
       {error ? (
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{error}</span><button onClick={() => setError(undefined)}>닫기</button></div>
       ) : null}
-      {settingsOpen ? <AppearanceSettingsPanel settings={appearance} onChange={setAppearance} onClose={closeSettings} /> : null}
+      {settingsOpen ? (
+        <SettingsPanel
+          appearance={appearance}
+          onAppearanceChange={setAppearance}
+          ollama={ollama}
+          onOllamaUpdated={setOllama}
+          initialTab={settingsTab}
+          onClose={closeSettings}
+        />
+      ) : null}
+      <AssistantPanel
+        open={assistantOpen}
+        settings={ollama}
+        noteTitle={activeNote?.title}
+        noteContent={editorValue}
+        onOpenSettings={() => openSettings('ollama')}
+        onInsertToNote={insertAssistantText}
+        onClose={() => setAssistantOpen(false)}
+      />
       {deleteTarget ? (
         <ConfirmDialog
           title="노트 삭제"
@@ -688,6 +1019,16 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           danger
           onConfirm={() => void confirmDeleteNote()}
           onCancel={() => setDeleteTarget(null)}
+        />
+      ) : null}
+      {deleteFolderTarget ? (
+        <ConfirmDialog
+          title="폴더 삭제"
+          message={`'${deleteFolderTarget}' 폴더와 그 안의 모든 노트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+          confirmLabel="삭제"
+          danger
+          onConfirm={() => void confirmDeleteFolder()}
+          onCancel={() => setDeleteFolderTarget(null)}
         />
       ) : null}
     </div>

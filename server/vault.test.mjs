@@ -166,4 +166,30 @@ describe('server file vault', () => {
     await expect(vault.moveFolder('notes', 'taken')).rejects.toMatchObject({ status: 409 });
     await expect(vault.moveFolder('missing', 'somewhere')).rejects.toMatchObject({ status: 404 });
   });
+
+  it('deletes folders recursively while keeping siblings', async () => {
+    const { root, vault } = await createVault();
+    await vault.createFolder('projects/web');
+    await vault.write('projects/web/plan.md', '# Plan', { createOnly: true });
+    await vault.write('projects/other.md', 'keep', { createOnly: true });
+
+    await vault.removeFolder('projects/web');
+
+    await expect(access(join(root, 'projects/web'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(join(root, 'projects/other.md'), 'utf8')).toBe('keep');
+    const { entries, folders } = await vault.scan();
+    expect(entries).toEqual([expect.objectContaining({ path: 'projects/other.md' })]);
+    expect(folders).toEqual([expect.objectContaining({ path: 'projects' })]);
+    await expect(vault.removeFolder('missing')).rejects.toMatchObject({ status: 404 });
+    await expect(vault.removeFolder('projects/other.md')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('rejects deleting folders that are symlinks or escape the vault', async () => {
+    const { root, vault } = await createVault();
+    const outside = await mkdtemp(join(tmpdir(), 'webobsidian-outside-'));
+    await symlink(outside, join(root, 'escape'));
+
+    await expect(vault.removeFolder('escape')).rejects.toMatchObject({ status: 400 });
+    await expect(vault.removeFolder('../outside')).rejects.toMatchObject({ status: 400 });
+  });
 });

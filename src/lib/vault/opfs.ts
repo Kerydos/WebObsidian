@@ -102,6 +102,11 @@ export class OpfsVaultRepository implements VaultRepository {
     await directory.removeEntry(name);
   }
 
+  async removeFolder(path: string): Promise<void> {
+    const { directory, name } = await getParent(path, false);
+    await directory.removeEntry(name, { recursive: true });
+  }
+
   async rename(path: string, newPath: string): Promise<VaultDocument> {
     const document = await this.read(path);
     const moved = await this.write(newPath, document.content);

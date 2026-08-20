@@ -103,6 +103,11 @@ export class LocalFsVaultRepository implements VaultRepository {
     await directory.removeEntry(name);
   }
 
+  async removeFolder(path: string): Promise<void> {
+    const { directory, name } = await locate(this.root, path);
+    await directory.removeEntry(name, { recursive: true });
+  }
+
   async rename(path: string, newPath: string): Promise<VaultDocument> {
     const document = await this.read(path);
     const moved = await this.write(newPath, document.content);

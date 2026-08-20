@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readdir, readFile, realpath, rename, stat, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
+import { VaultChangeBus } from './events.mjs';
 
 const INVALID_SEGMENT = /(^|\/)\.{1,2}(\/|$)|[\\\0]/;
 
@@ -29,7 +30,7 @@ export function normalizeFolderPath(path) {
   return normalized;
 }
 
-function revisionOf(content) {
+export function revisionOf(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
@@ -55,6 +56,7 @@ export class FileVault {
   constructor(root) {
     this.root = resolve(root);
     this.writeQueue = Promise.resolve();
+    this.changes = new VaultChangeBus();
   }
 
   async initialize() {
@@ -118,6 +120,7 @@ export class FileVault {
     await mkdir(folderPath, { recursive: true });
     const realFolder = await realpath(folderPath);
     if (!isInside(this.realRoot, realFolder)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    this.changes.publish({ type: 'vault', action: 'reload' });
     return { path: vaultPath, name: basename(vaultPath) };
   }
 
@@ -176,7 +179,9 @@ export class FileVault {
         if (error?.code !== 'ENOENT') throw error;
       });
     }
-    return entryFor(filePath, vaultPath, Buffer.from(content));
+    const saved = await entryFor(filePath, vaultPath, Buffer.from(content));
+    this.changes.publish({ type: 'note', action: 'upsert', path: vaultPath, revision: saved.revision });
+    return saved;
   }
 
   remove(path) {
@@ -186,7 +191,7 @@ export class FileVault {
   }
 
   async removeFile(path) {
-    const { filePath } = this.resolvePath(path);
+    const { vaultPath, filePath } = this.resolvePath(path);
     try {
       const details = await lstat(filePath);
       if (details.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
@@ -197,6 +202,7 @@ export class FileVault {
       throw error;
     }
     await unlink(filePath);
+    this.changes.publish({ type: 'note', action: 'delete', path: vaultPath });
   }
 
   move(path, newPath) {
@@ -206,7 +212,7 @@ export class FileVault {
   }
 
   async moveFile(path, newPath) {
-    const { filePath: source } = this.resolvePath(path);
+    const { vaultPath: sourceVaultPath, filePath: source } = this.resolvePath(path);
     const { vaultPath: destVaultPath, filePath: destination } = this.resolvePath(newPath);
     try {
       const details = await lstat(source);
@@ -231,7 +237,9 @@ export class FileVault {
     if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
 
     await rename(source, destination);
-    return entryFor(destination, destVaultPath);
+    const moved = await entryFor(destination, destVaultPath);
+    this.changes.publish({ type: 'note', action: 'move', path: sourceVaultPath, newPath: destVaultPath, revision: moved.revision });
+    return moved;
   }
 
   moveFolder(path, newPath) {
@@ -277,6 +285,31 @@ export class FileVault {
     if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
 
     await rename(source, destination);
+    this.changes.publish({ type: 'vault', action: 'reload' });
     return { path: destVaultPath, name: basename(destVaultPath) };
+  }
+
+  removeFolder(path) {
+    const operation = this.writeQueue.then(() => this.removeFolderEntry(path));
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async removeFolderEntry(path) {
+    const { folderPath } = this.resolveFolderPath(path);
+    if (folderPath === this.root) throw new VaultError('볼트 루트는 삭제할 수 없습니다.');
+    let details;
+    try {
+      details = await lstat(folderPath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+      throw error;
+    }
+    if (details.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
+    if (!details.isDirectory()) throw new VaultError('폴더를 찾을 수 없습니다.', 404);
+    const realFolder = await realpath(folderPath);
+    if (!isInside(this.realRoot, realFolder)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
+    await rm(folderPath, { recursive: true });
+    this.changes.publish({ type: 'vault', action: 'reload' });
   }
 }
