@@ -37,7 +37,6 @@ import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/setti
 import { checkGrammar, emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
 
 const GRAMMAR_CHECK_STORAGE_KEY = 'webobsidian:grammarcheck:v1';
-const maxGrammarResults = 20;
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 
@@ -153,7 +152,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       return false;
     }
   });
-  const [grammarResults, setGrammarResults] = useState<GrammarCheckResult[]>([]);
+  const [grammarResult, setGrammarResult] = useState<GrammarCheckResult | null>(null);
   const [grammarChecking, setGrammarChecking] = useState(false);
   const [grammarError, setGrammarError] = useState<string>();
   const grammarAbortRef = useRef<AbortController | null>(null);
@@ -188,7 +187,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   useEffect(() => {
     grammarAbortRef.current?.abort();
     lastGrammarTextRef.current = '';
-    setGrammarResults([]);
+    setGrammarResult(null);
     setGrammarChecking(false);
     setGrammarError(undefined);
   }, [activePath]);
@@ -705,25 +704,24 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
   const grammarConfigured = ollama.hasApiKey && ollama.model !== '';
 
-  // Enter로 문단을 마칠 때마다 직전 문단을 서버의 Ollama Cloud 모델로 검사한다.
-  // 진행 중이던 검사는 새 문단이 들어오면 취소하고 최신 요청만 반영한다.
-  const handleParagraphCommitted = useCallback((paragraph: string) => {
+  // Enter로 문장을 마칠 때마다 엔터 직전 줄(그 문장)만 서버의 Ollama Cloud 모델로 검사한다.
+  // 새 문장이 들어오면 진행 중이던 검사를 취소하고, 이전에 표시하던 결과도 즉시 지운 뒤
+  // 최신 요청의 결과만 다시 표시한다.
+  const handleSentenceCommitted = useCallback((sentence: string) => {
     if (!grammarEnabled || !grammarConfigured) return;
-    if (paragraph === lastGrammarTextRef.current) return;
-    lastGrammarTextRef.current = paragraph;
+    if (sentence === lastGrammarTextRef.current) return;
+    lastGrammarTextRef.current = sentence;
     grammarAbortRef.current?.abort();
     const controller = new AbortController();
     grammarAbortRef.current = controller;
     setGrammarError(undefined);
+    setGrammarResult(null);
     setGrammarChecking(true);
-    void checkGrammar({ model: ollama.model, text: paragraph, signal: controller.signal })
+    void checkGrammar({ model: ollama.model, text: sentence, signal: controller.signal })
       .then((issues) => {
         if (controller.signal.aborted) return;
         grammarResultIdRef.current += 1;
-        setGrammarResults((current) => [
-          { id: grammarResultIdRef.current, paragraph, issues },
-          ...current,
-        ].slice(0, maxGrammarResults));
+        setGrammarResult({ id: grammarResultIdRef.current, sentence, issues });
       })
       .catch((cause) => {
         if (controller.signal.aborted) return;
@@ -940,7 +938,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               value={editorValue}
               onChange={setEditorValue}
               onNavigateWikiLink={navigateLink}
-              onParagraphCommitted={handleParagraphCommitted}
+              onSentenceCommitted={handleSentenceCommitted}
             />
           </Suspense>
         ) : (
@@ -985,7 +983,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           configured={grammarConfigured}
           checking={grammarChecking}
           error={grammarError}
-          results={grammarResults}
+          result={grammarResult}
         />
       </aside>
 
