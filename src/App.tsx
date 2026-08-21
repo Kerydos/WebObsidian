@@ -32,6 +32,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { SettingsPanel, type SettingsTab } from './components/SettingsPanel';
 import { AssistantPanel } from './components/AssistantPanel';
 import { GrammarCheckPanel, type GrammarCheckResult } from './components/GrammarCheckPanel';
+import { applyGrammarIssues, hasApplicableFix } from './components/grammarMark';
 import { APPEARANCE_STORAGE_KEY, appearanceVariables, parseAppearance } from './lib/settings/appearance';
 import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/settings/ollama';
 import { checkGrammar, emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
@@ -735,6 +736,25 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       });
   }, [grammarEnabled, grammarConfigured, ollama.model]);
 
+  // 검사 결과의 수정 제안을 본문(에디터 내용)에 반영한다. 저장은 기존 자동 저장 흐름을 따른다.
+  const handleApplyGrammar = useCallback(() => {
+    const result = grammarResult;
+    if (!result || result.applied) return;
+    if (!hasApplicableFix(result.issues)) {
+      setGrammarError('적용할 수정이 없습니다.');
+      return;
+    }
+    const before = editorValueRef.current;
+    const after = applyGrammarIssues(before, result.sentence, result.issues);
+    if (after === before) {
+      setGrammarError('본문에서 해당 문장을 찾을 수 없어 적용하지 못했습니다.');
+      return;
+    }
+    setGrammarError(undefined);
+    setEditorValue(after);
+    setGrammarResult({ ...result, applied: true });
+  }, [grammarResult]);
+
   return (
     <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={appearanceVariables(appearance)}>
       <header className="topbar">
@@ -984,6 +1004,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           checking={grammarChecking}
           error={grammarError}
           result={grammarResult}
+          onApply={handleApplyGrammar}
         />
       </aside>
 

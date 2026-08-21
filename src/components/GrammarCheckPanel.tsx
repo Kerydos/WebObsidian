@@ -1,10 +1,12 @@
-import { CircleAlert, LoaderCircle, SpellCheck2 } from 'lucide-react';
+import { Check, CircleAlert, LoaderCircle, SpellCheck2 } from 'lucide-react';
 import type { GrammarIssue } from '../lib/ai/ollamaCloud';
+import { hasApplicableFix, markGrammarIssues } from './grammarMark';
 
 export interface GrammarCheckResult {
   id: number;
   sentence: string;
   issues: GrammarIssue[];
+  applied?: boolean;
 }
 
 interface GrammarCheckPanelProps {
@@ -14,16 +16,36 @@ interface GrammarCheckPanelProps {
   checking: boolean;
   error?: string;
   result: GrammarCheckResult | null;
+  onApply: () => void;
 }
 
-function excerpt(text: string, max = 90) {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+const PARAGRAPH_LIMIT = 160;
+
+// 검사된 문장을 그대로 보여 주되 수정이 필요한 부분은 취소선·빨간 텍스트로,
+// 바로 옆에 제안 표현을 함께 표시한다. 지나치게 긴 문장은 뒷부분을 줄인다.
+function renderSentence(sentence: string, issues: GrammarIssue[]) {
+  const truncated = sentence.length > PARAGRAPH_LIMIT;
+  const display = truncated ? sentence.slice(0, PARAGRAPH_LIMIT) : sentence;
+  return (
+    <>
+      {markGrammarIssues(display, issues).map((segment, index) =>
+        segment.issue ? (
+          <span key={index}>
+            <span className="grammar-mark-original">{segment.text}</span>
+            {segment.issue.suggestion ? <span className="grammar-mark-suggestion">{segment.issue.suggestion}</span> : null}
+          </span>
+        ) : (
+          segment.text
+        ),
+      )}
+      {truncated ? '…' : null}
+    </>
+  );
 }
 
 // Enter로 문장을 마칠 때마다(엔터 직전 줄만) 서버에 저장된 Ollama Cloud 모델로 띄어쓰기·문법을
 // 검사해 결과를 보여 주는 우측 패널 섹션. 결과는 항상 최신 한 건만 표시하고 이전 표시는 지운다.
-export function GrammarCheckPanel({ enabled, onToggle, configured, checking, error, result }: GrammarCheckPanelProps) {
+export function GrammarCheckPanel({ enabled, onToggle, configured, checking, error, result, onApply }: GrammarCheckPanelProps) {
   return (
     <section className="grammar-panel">
       <h2>
@@ -55,21 +77,32 @@ export function GrammarCheckPanel({ enabled, onToggle, configured, checking, err
           ) : null}
           {result && !checking ? (
             <article key={result.id} className="grammar-result" data-clean={result.issues.length === 0}>
-              <p className="grammar-paragraph">{excerpt(result.sentence)}</p>
+              <p className="grammar-paragraph">{renderSentence(result.sentence, result.issues)}</p>
               {result.issues.length === 0 ? (
                 <p className="grammar-clean">문제 없음</p>
               ) : (
-                <ul className="grammar-issue-list">
-                  {result.issues.map((issue, index) => (
-                    <li key={index}>
-                      <span className="grammar-issue-diff">
-                        <span className="grammar-issue-original">{issue.original}</span>
-                        {issue.suggestion ? <><span aria-hidden="true"> → </span><span className="grammar-issue-suggestion">{issue.suggestion}</span></> : null}
-                      </span>
-                      {issue.reason ? <span className="grammar-issue-reason">{issue.reason}</span> : null}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="grammar-issue-list">
+                    {result.issues.map((issue, index) => (
+                      <li key={index}>
+                        <span className="grammar-issue-diff">
+                          <span className="grammar-issue-original">{issue.original}</span>
+                          {issue.suggestion ? <><span aria-hidden="true"> → </span><span className="grammar-issue-suggestion">{issue.suggestion}</span></> : null}
+                        </span>
+                        {issue.reason ? <span className="grammar-issue-reason">{issue.reason}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {result.applied ? (
+                    <p className="grammar-applied"><Check size={13} /> 본문에 적용했습니다.</p>
+                  ) : hasApplicableFix(result.issues) ? (
+                    <div className="grammar-apply-row">
+                      <button type="button" className="grammar-apply" onClick={onApply}>
+                        <Check size={13} /> 적용
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               )}
             </article>
           ) : null}
