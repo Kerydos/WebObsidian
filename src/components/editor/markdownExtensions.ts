@@ -1,6 +1,6 @@
 import { indentLess, indentMore } from '@codemirror/commands';
 import { syntaxTree } from '@codemirror/language';
-import type { EditorView, KeyBinding } from '@codemirror/view';
+import { EditorView, type KeyBinding } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import { tags } from '@lezer/highlight';
 import type { MarkdownConfig } from '@lezer/markdown';
@@ -54,3 +54,24 @@ export const listIndentKeymap: readonly KeyBinding[] = [
   { key: 'Tab', run: (view) => (cursorInList(view) ? indentMore(view) : false) },
   { key: 'Shift-Tab', run: (view) => (cursorInList(view) ? indentLess(view) : false) },
 ];
+
+/**
+ * Typing `::` inserts the current time (e.g. `09:00`) in place of the two colons.
+ */
+export const timeSnippet = EditorView.updateListener.of((update) => {
+  if (!update.docChanged) return;
+  const { head, empty } = update.state.selection.main;
+  if (!empty) return;
+  let typedColon = false;
+  update.changes.iterChanges((_fromA, _toA, _fromB, toB, inserted) => {
+    if (inserted.toString() === ':' && toB === head) typedColon = true;
+  });
+  if (!typedColon || head < 2) return;
+  if (update.state.sliceDoc(head - 2, head) !== '::') return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  update.view.dispatch({
+    changes: { from: head - 2, to: head, insert: `${hh}:${mm}` },
+  });
+});

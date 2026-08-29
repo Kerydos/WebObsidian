@@ -3,7 +3,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
 import { livePreview } from './editor/livePreview';
-import { Highlight, listIndentKeymap } from './editor/markdownExtensions';
+import { Highlight, listIndentKeymap, timeSnippet } from './editor/markdownExtensions';
 import { sentenceCommitListener } from './editor/sentenceCommit';
 
 interface MarkdownEditorProps {
@@ -24,6 +24,7 @@ export default function MarkdownEditor({ value, onChange, onNavigateWikiLink, on
       livePreview((target) => navigateRef.current?.(target)),
       sentenceCommitListener((sentence) => sentenceCommittedRef.current?.(sentence)),
       keymap.of(listIndentKeymap),
+      timeSnippet,
       EditorView.lineWrapping,
       EditorView.theme({
         '&': { height: '100%', backgroundColor: 'transparent' },
