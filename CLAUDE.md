@@ -28,12 +28,19 @@
 ## 주요 파일
 
 - `server/server.mjs`: 정적 파일 및 HTTP API 서버
-- `server/auth.mjs`: 로그인, 세션, 로그아웃, 로그인 시도 제한
+- `server/auth.mjs`: 로그인, 세션, 로그아웃, 로그인 시도 제한(최소 비밀번호 길이는 `minLength` 옵션으로 조정 가능, 기본 12자)
 - `server/vault.mjs`: 마크다운 파일 읽기·쓰기, 경로 검증, 충돌 감지
 - `server/ollama.mjs`: Ollama Cloud API 프록시(모델 목록, 스트리밍 채팅)와 서버 측 공유 설정 저장소
+- `server/watcher.mjs`: 볼트 폴더 감시(fs.watch + 폴링 폴백), 변경을 SSE 버스로 전달
 - `src/lib/vault/server.ts`: 프론트엔드의 서버 Vault 저장소 어댑터
 - `src/lib/vault/localFs.ts`: Chromium 계열 브라우저의 로컬 폴더 연결 지원
 - `src/lib/vault/opfs.ts`: 기존 브라우저 OPFS 저장소 구현
+- `src/hooks/useVault.ts`: 볼트 데이터 흐름 전부(목록/문서 상태, CRUD, 자동 저장, 검색 인덱스, 활성 노트)
+- `src/hooks/useVaultSync.ts`: 서버 변경 이벤트(SSE) 구독과 전체 재조회 디바운스
+- `src/hooks/useGrammarChecker.ts`: 문장 단위 맞춤법 검사 상태와 수정 적용
+- `src/hooks/useAppearanceTheme.ts`: 테마·글꼴 설정 상태와 localStorage 유지
+- `src/components/layout/Topbar.tsx` · `Sidebar.tsx` · `Inspector.tsx`: 상단 바 / 좌측 트리 / 우측 인스펙터
+- `src/components/dialogs/VaultSwitcher.tsx`: 볼트 저장소 전환 모달(상단 vault pill 클릭)
 - `src/lib/settings/ollama.ts`: 과거 localStorage 저장 설정의 마이그레이션 헬퍼
 - `src/lib/ai/ollamaCloud.ts`: Ollama Cloud 클라이언트(공유 설정 조회·저장, 모델 목록, NDJSON 스트리밍 채팅)
 - `src/components/MarkdownEditor.tsx`: CodeMirror 편집기와 라이브 프리뷰 연결
@@ -41,7 +48,7 @@
 - `src/components/OllamaSettings.tsx`: API 키 입력과 모델 선택 설정 화면
 - `src/components/AssistantPanel.tsx`: Ollama Cloud 기반 AI 도우미 패널
 - `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현(콜아웃, 프론트매터, 표 셀 인라인 렌더링 포함)
-- `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵
+- `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵, `::` 시각 삽입 스니펫
 - `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
 - `compose.yaml`, `Dockerfile`: 컨테이너 배포 설정
 
@@ -90,6 +97,7 @@ docker compose up -d --build
 ## 환경 변수
 
 - `WEBOBSIDIAN_PASSWORD`: 필수. 최소 12자 단일 관리자 비밀번호
+- `WEBOBSIDIAN_MIN_PASSWORD_LENGTH`: 선택. 비밀번호 최소 길이 완화(기본 12). 개인 테스트 환경용이며 운영에서는 기본값을 유지한다
 - `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
 - `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
 - `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
@@ -158,7 +166,7 @@ docker compose up -d --build
 상호작용 원칙:
 
 - 렌더링된 요소를 일반 클릭하면 원문 편집 상태로 돌아간다.
-- 예외: 위키 링크는 일반 클릭 시 바로 연결된 노트로 이동한다. 위키 링크의 원문(`[[...]]`)을 편집하려면 `Cmd` 또는 `Ctrl`을 누른 채 클릭한다(Obsidian의 라이브 프리뷰 동작과 동일).
+- 예외: 위키 링크는 일반 클릭 시 바로 연결된 노트로 이동한다. 연결 대상 노트가 없으면 현재 노트와 같은 폴더에 링크 이름의 새 노트를 만들어 바로 연다(경로가 포함된 링크는 볼트 루트 기준 경로에 생성). 위키 링크의 원문(`[[...]]`)을 편집하려면 `Cmd` 또는 `Ctrl`을 누른 채 클릭한다(Obsidian의 라이브 프리뷰 동작과 동일).
 - 일반 마크다운 링크(`[text](url)`)는 여전히 일반 클릭 시 원문 편집 상태로 돌아가고, `Cmd`/`Ctrl`+클릭으로 새 탭에서 연다.
 - URL은 검사하며 `javascript:` 같은 위험한 스킴을 차단한다.
 - 블록 위젯은 완전한 줄 단위 범위에만 적용하여 CodeMirror 장식 중첩 오류를 방지한다.
@@ -224,6 +232,7 @@ ollama.com의 클라우드 모델(gpt-oss:120b, qwen3.5 등)을 사용하는 AI 
 
 ```bash
 npm test
+npm run lint
 npm run build
 ```
 
@@ -238,7 +247,7 @@ npm run build
 - 표 셀 안의 인라인 마크다운은 별도 파서로 다시 렌더링한 정적 HTML이라 셀 내부를 직접 클릭 편집할 수 없다. 전체 위젯을 클릭하면 원문 편집 모드로 전환된다.
 - 코드 블록은 언어 이름만 표시하고 언어별 구문 강조는 제공하지 않는다.
 - 서버 Vault API는 `.md`만 제공하므로 Vault 내부 이미지 첨부 파일을 별도로 서비스하지 않는다. 상대 이미지 경로와 Obsidian 임베드는 첨부 파일 제공 기능 없이는 정상 표시되지 않을 수 있다.
-- 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 명확한 서버 저장소 복귀 UI는 아직 없다.
+- 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 상단 바의 vault pill 클릭으로 서버·로컬 폴더·브라우저(OPFS) 저장소를 전환할 수 있다.
 
 ## 변경 시 주의사항
 

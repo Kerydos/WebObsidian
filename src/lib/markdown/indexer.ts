@@ -13,7 +13,7 @@ export interface NoteIndex {
   links: WikiLink[];
 }
 
-const WIKI_LINK = /(!?)\[\[([^\[\]|#]+)(?:#([^\[\]|]+))?(?:\|([^\[\]]+))?\]\]/g;
+const WIKI_LINK = /(!?)\[\[([^[\]|#]+)(?:#([^[\]|]+))?(?:\|([^[\]]+))?\]\]/g;
 const TAG = /(^|\s)(#[\p{L}\p{N}_/-]+)/gu;
 
 function withoutInlineCode(line: string): string {

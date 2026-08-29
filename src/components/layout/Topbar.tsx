@@ -1,0 +1,51 @@
+import { Bot, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Settings2, Sparkles } from 'lucide-react';
+import type { SaveState } from '../../hooks/useVault';
+
+interface TopbarProps {
+  repositoryName: string;
+  saveState: SaveState;
+  assistantOpen: boolean;
+  onToggleAssistant: () => void;
+  onOpenSettings: () => void;
+  onOpenVaultSwitcher: () => void;
+  onLogout: () => void;
+}
+
+export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssistant, onOpenSettings, onOpenVaultSwitcher, onLogout }: TopbarProps) {
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <span className="brand-mark"><Sparkles size={16} /></span>
+        <strong>WebObsidian</strong>
+        <button
+          type="button"
+          className="vault-pill"
+          onClick={onOpenVaultSwitcher}
+          title="볼트 저장소 전환"
+          aria-label={`현재 볼트: ${repositoryName}. 클릭하면 저장소를 전환할 수 있습니다.`}
+        >
+          <HardDrive size={13} /> {repositoryName}
+        </button>
+      </div>
+      <div className="topbar-actions">
+        <div className="save-status" data-state={saveState}>
+          {saveState === 'saving' ? <LoaderCircle size={14} className="spin" /> : null}
+          {saveState === 'saved' ? <Check size={14} /> : null}
+          {saveState === 'error' ? <CircleAlert size={14} /> : null}
+          {saveState === 'dirty' ? '편집 중' : saveState === 'saving' ? '저장 중' : saveState === 'error' ? '저장 실패' : '저장됨'}
+        </div>
+        <button
+          className={assistantOpen ? 'topbar-button active' : 'topbar-button'}
+          onClick={onToggleAssistant}
+          title="AI 도우미"
+          aria-label="AI 도우미 열기"
+          aria-pressed={assistantOpen}
+        >
+          <Bot size={16} />
+        </button>
+        <button className="topbar-button" onClick={onOpenSettings} title="설정" aria-label="설정 열기"><Settings2 size={16} /></button>
+        <button className="logout-button" onClick={onLogout} title="로그아웃"><LogOut size={15} /> 로그아웃</button>
+      </div>
+    </header>
+  );
+}

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
@@ -15,13 +15,19 @@ interface MarkdownEditorProps {
 
 export default function MarkdownEditor({ value, onChange, onNavigateWikiLink, onSentenceCommitted }: MarkdownEditorProps) {
   const navigateRef = useRef(onNavigateWikiLink);
-  navigateRef.current = onNavigateWikiLink;
   const sentenceCommittedRef = useRef(onSentenceCommitted);
-  sentenceCommittedRef.current = onSentenceCommitted;
+  // 콜백은 커밋 이후 에디터 이벤트에서만 호출되므로, 커밋 시점에 최신 값을 담는다.
+  useEffect(() => {
+    navigateRef.current = onNavigateWikiLink;
+    sentenceCommittedRef.current = onSentenceCommitted;
+  });
   const extensions = useMemo(
     () => [
       markdown({ base: markdownLanguage, extensions: Highlight }),
+      // 확장은 에디터당 한 번만 생성되므로 최신 콜백은 ref로 전달한다(이벤트 시점에 호출됨).
+      // eslint-disable-next-line react-hooks/refs
       livePreview((target) => navigateRef.current?.(target)),
+      // eslint-disable-next-line react-hooks/refs
       sentenceCommitListener((sentence) => sentenceCommittedRef.current?.(sentence)),
       keymap.of(listIndentKeymap),
       timeSnippet,

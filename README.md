@@ -33,6 +33,7 @@ npm run dev
 
 ```bash
 npm test
+npm run lint
 npm run build
 ```
 
@@ -72,6 +73,7 @@ docker compose up -d --build
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `WEBOBSIDIAN_PASSWORD` | 없음, 필수 | 12자 이상의 관리자 비밀번호 |
+| `WEBOBSIDIAN_MIN_PASSWORD_LENGTH` | `12` | 비밀번호 최소 길이. 개인 테스트 환경에서만 완화 |
 | `WEBOBSIDIAN_SECURE_COOKIE` | 운영 모드에서 `true` | HTTPS 전용 세션 쿠키 사용 여부 |
 | `WEBOBSIDIAN_VAULT_DIR` | 프로젝트의 `vault/` | Markdown 파일 저장 폴더 |
 | `WEBOBSIDIAN_DIST_DIR` | 프로젝트의 `dist/` | 빌드된 정적 파일 폴더 |

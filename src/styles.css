@@ -113,7 +113,8 @@ button { color: inherit; }
 .brand, .save-status, .vault-pill, .topbar-actions { display: flex; align-items: center; }
 .brand { gap: 10px; letter-spacing: -.02em; }
 .brand-mark { width: 27px; height: 27px; display: grid; place-items: center; background: var(--accent); border-radius: 7px; }
-.vault-pill { gap: 5px; margin-left: 8px; padding: 4px 8px; border: 1px solid #48433d; border-radius: 999px; color: #bdb5a9; font-size: 13px; font-weight: 500; }
+.vault-pill { gap: 5px; margin-left: 8px; padding: 4px 8px; border: 1px solid #48433d; border-radius: 999px; background: transparent; color: #bdb5a9; font-size: 13px; font-weight: 500; cursor: pointer; }
+.vault-pill:hover { background: #2c2925; color: white; }
 .save-status { gap: 6px; color: #a9a297; font-size: 14px; }
 .save-status[data-state='error'] { color: #f0a48b; }
 .topbar-actions { gap: 9px; }
@@ -352,6 +353,19 @@ button { color: inherit; }
 .confirm-actions .confirm-primary { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .confirm-actions .confirm-danger { border-color: #c0392b; background: #c0392b; color: #fff; }
 .confirm-actions .confirm-danger:hover { background: #a93225; }
+
+.vault-option-list { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 4px; }
+.vault-current { margin: 0 0 2px; }
+.vault-option { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.vault-option:hover:not(:disabled) { background: var(--surface-hover); }
+.vault-option:disabled { opacity: .45; cursor: default; }
+.vault-option.active { border-color: var(--accent); }
+.vault-option > svg { flex: none; margin-top: 2px; color: var(--muted); }
+.vault-option.active > svg { color: var(--accent); }
+.vault-option-text { display: flex; flex-direction: column; gap: 3px; }
+.vault-option-text strong { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.vault-option-text small { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.vault-option-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: 11px; font-weight: 600; }
 
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; transform: translateX(-50%); max-width: min(520px, calc(100vw - 40px)); display: flex; align-items: center; gap: 9px; padding: 10px 12px; background: #2d2925; color: white; border-radius: 8px; box-shadow: 0 12px 40px rgba(30,25,20,.25); font-size: 14px; }
 .toast svg { flex: none; color: #e99a7d; }
