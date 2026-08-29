@@ -86,7 +86,12 @@ async function serveStatic(request, response, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
-const auth = new AuthManager(process.env.WEBOBSIDIAN_PASSWORD);
+// 개인 테스트 환경에서 짧은 비밀번호를 쓸 수 있도록 최소 길이를 환경 변수로 완화한다(기본 12자).
+const configuredMinLength = Number(process.env.WEBOBSIDIAN_MIN_PASSWORD_LENGTH);
+const minPasswordLength = Number.isInteger(configuredMinLength) && configuredMinLength > 0
+  ? configuredMinLength
+  : 12;
+const auth = new AuthManager(process.env.WEBOBSIDIAN_PASSWORD, { minLength: minPasswordLength });
 const vault = new FileVault(vaultRoot);
 await vault.initialize();
 const watcher = new VaultWatcher(vaultRoot, vault.changes);

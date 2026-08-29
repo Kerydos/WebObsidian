@@ -6,6 +6,13 @@ describe('server authentication', () => {
     expect(() => new AuthManager('short')).toThrow('12자 이상');
   });
 
+  it('accepts a shorter password when the minimum length is lowered', () => {
+    const auth = new AuthManager('test1234', { minLength: 8 });
+    const token = auth.login('test1234', 'client');
+    expect(auth.isAuthenticated(token)).toBe(true);
+    expect(() => new AuthManager('test', { minLength: 8 })).toThrow('8자 이상');
+  });
+
   it('creates and expires sessions', () => {
     let now = 1_000;
     const auth = new AuthManager('correct horse', { now: () => now, sessionTtlMs: 100 });

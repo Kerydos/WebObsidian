@@ -19,9 +19,10 @@ export class AuthManager {
     sessionTtlMs = 7 * 24 * 60 * 60 * 1000,
     attemptWindowMs = 15 * 60 * 1000,
     maxAttempts = 5,
+    minLength = 12,
   } = {}) {
-    if (!password || password.length < 12) {
-      throw new Error('WEBOBSIDIAN_PASSWORD는 12자 이상으로 설정해야 합니다.');
+    if (!password || password.length < minLength) {
+      throw new Error(`WEBOBSIDIAN_PASSWORD는 ${minLength}자 이상으로 설정해야 합니다.`);
     }
     this.passwordDigest = digest(password);
     this.now = now;
