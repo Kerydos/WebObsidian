@@ -4,13 +4,13 @@ import { EditorState, type Transaction } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
 import { buildLivePreviewDecorations, buildLivePreviewModel, livePreview, sanitizePreviewUrl } from './livePreview';
-import { Highlight, listIndentKeymap } from './markdownExtensions';
+import { CjkEmphasis, Highlight, listIndentKeymap } from './markdownExtensions';
 
 function stateFor(doc: string, anchor = doc.length) {
   return EditorState.create({
     doc,
     selection: { anchor },
-    extensions: [markdown({ base: markdownLanguage, extensions: Highlight })],
+    extensions: [markdown({ base: markdownLanguage, extensions: [Highlight, CjkEmphasis] })],
   });
 }
 
@@ -19,6 +19,13 @@ function modelFor(doc: string, anchor = doc.length) {
 }
 
 describe('in-place Markdown live preview', () => {
+  it('keeps syntax rendered under the cursor in read-only mode', () => {
+    const doc = '# Heading';
+    expect(buildLivePreviewModel(stateFor(doc, 0))).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'heading', active: true })]));
+    const readOnly = EditorState.create({ doc, selection: { anchor: 0 }, extensions: [markdown({ base: markdownLanguage }), EditorState.readOnly.of(true)] });
+    expect(buildLivePreviewModel(readOnly)).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'heading', active: false })]));
+  });
+
   it('recognizes inline Markdown, links, and interactive tasks', () => {
     const model = modelFor([
       '# Heading',
@@ -124,6 +131,14 @@ describe('in-place Markdown live preview', () => {
     expect(sanitizePreviewUrl('./image.png', true)).toBe('./image.png');
   });
 
+  it('renders emphasis followed by Korean particles after punctuation', () => {
+    const inline = modelFor("아니라 **'혈당 조절'**를 키우는 **암묵지(Tacit)**를 ~~'취소'~~는 =='형광'==은 **‘인용’**을\n\nend")
+      .filter((element) => element.kind === 'inline')
+      .map((element) => element.kind === 'inline' && element.style);
+    expect(inline).toEqual(['strong', 'strong', 'strike', 'highlight', 'strong']);
+    expect(modelFor('snake_case and a * b\n\nend').filter((element) => element.kind === 'inline')).toEqual([]);
+  });
+
   it('recognizes ==highlight== spans', () => {
     const model = modelFor('This is ==important== text\n\nplain cursor');
 
@@ -204,7 +219,7 @@ describe('in-place Markdown live preview', () => {
   });
 
   it('renders nested inline Markdown inside table cells instead of raw source text', () => {
-    const document = ['| Name | Detail |', '| --- | --- |', '| **Bold** cell | see [docs](https://example.com/docs) |', '', 'plain cursor'].join('\n');
+    const document = ['| Name | Detail |', '| --- | --- |', '| **Bold** cell | see [docs](https://example.com/docs)<br>next <script> |', '', 'plain cursor'].join('\n');
     const decorations = buildLivePreviewDecorations(stateFor(document));
     const iter = decorations.iter();
     let tableDom: HTMLElement | undefined;
@@ -220,6 +235,8 @@ describe('in-place Markdown live preview', () => {
     expect(boldCell?.textContent).toBe('Bold');
     const linkCell = tableDom!.querySelector('td .cm-live-table-link');
     expect(linkCell?.textContent).toBe('docs');
+    expect(tableDom!.querySelectorAll('td br')).toHaveLength(1);
+    expect(tableDom!.querySelector('script')).toBeNull();
   });
 
   it('indents and outdents list items with Tab / Shift-Tab, and leaves the cursor untouched outside lists', () => {

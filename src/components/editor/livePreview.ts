@@ -4,7 +4,7 @@ import { StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
 import type { MarkdownParser } from '@lezer/markdown';
-import { Highlight } from './markdownExtensions';
+import { CjkEmphasis, Highlight } from './markdownExtensions';
 
 type MarkerRange = { from: number; to: number };
 type VisibleRange = { from: number; to: number };
@@ -29,7 +29,8 @@ const WIKI_LINK = /\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]/g;
 const linkReferenceCache = new WeakMap<object, Map<string, string>>();
 
 function selectionTouches(state: EditorState, from: number, to: number) {
-  return state.selection.ranges.some((range) => range.from <= to && range.to >= from);
+  // 읽기 모드에서는 선택 위치와 무관하게 항상 렌더링된 상태를 유지한다.
+  return !state.readOnly && state.selection.ranges.some((range) => range.from <= to && range.to >= from);
 }
 
 function childRanges(node: SyntaxNode, name: string): MarkerRange[] {
@@ -399,7 +400,7 @@ class LinkWidget extends EditableWidget {
     link.title = href ? `${href} (⌘/Ctrl+클릭하여 열기)` : '클릭하여 편집';
     link.addEventListener('click', (event) => {
       event.preventDefault();
-      if ((event.metaKey || event.ctrlKey) && href) window.open(href, '_blank', 'noopener,noreferrer');
+      if ((event.metaKey || event.ctrlKey || view.state.readOnly) && href) window.open(href, '_blank', 'noopener,noreferrer');
       else activate(view, this.from);
     });
     return link;
@@ -460,7 +461,7 @@ class CodeBlockWidget extends EditableWidget {
   }
 }
 
-const cellInlineParser = (markdownLanguage.parser as MarkdownParser).configure(Highlight);
+const cellInlineParser = (markdownLanguage.parser as MarkdownParser).configure([Highlight, CjkEmphasis]);
 const INLINE_STYLE_CLASSES: Record<string, string> = {
   StrongEmphasis: 'cm-live-strong',
   Emphasis: 'cm-live-emphasis',
@@ -496,6 +497,13 @@ function renderInlineMarkdown(container: HTMLElement, text: string) {
         target.append(span);
         walk(child, span);
         flushTo(span, child.to);
+        continue;
+      }
+      // `<br>` is the only raw HTML allowed: GFM tables have no other way to break a line inside a cell.
+      if (child.name === 'HTMLTag' && /^<br\s*\/?>$/i.test(text.slice(child.from, child.to))) {
+        flushTo(target, child.from);
+        target.append(document.createElement('br'));
+        pos = child.to;
         continue;
       }
       if (INLINE_LINK_NODE_NAMES.has(child.name)) {

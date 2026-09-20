@@ -24,7 +24,7 @@ export const defaultAppearance: AppearanceSettings = {
   headingFont: 'sans',
   codeFont: 'system',
   documentStyle: 'comfortable',
-  fontSize: 20,
+  fontSize: 16,
   lineHeight: 1.8,
   accent: '#bf5f3b',
 };
@@ -84,7 +84,8 @@ export function appearanceVariables(settings: AppearanceSettings): AppearanceVar
     '--font-markdown': fontStacks[settings.bodyFont],
     '--font-heading': fontStacks[settings.headingFont],
     '--font-code': codeFontStacks[settings.codeFont],
-    '--markdown-font-size': `${settings.fontSize}px`,
+    // Rendered 1px smaller than the stored/displayed setting; the raw size reads too large in the editor.
+    '--markdown-font-size': `${settings.fontSize - 1}px`,
     '--markdown-line-height': settings.lineHeight,
     '--editor-width': styleWidths[settings.documentStyle],
     '--accent': settings.accent,

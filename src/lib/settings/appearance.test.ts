@@ -26,7 +26,7 @@ describe('appearance settings', () => {
   it('maps settings to editor variables', () => {
     const variables = appearanceVariables({ ...defaultAppearance, bodyFont: 'serif', fontSize: 18, documentStyle: 'compact' });
     expect(variables['--font-markdown']).toContain('Noto Serif KR');
-    expect(variables['--markdown-font-size']).toBe('18px');
+    expect(variables['--markdown-font-size']).toBe('17px');
     expect(variables['--editor-width']).toBe('760px');
   });
 });

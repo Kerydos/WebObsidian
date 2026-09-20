@@ -163,6 +163,13 @@ docker compose up -d --build
 - 목록 안에서 `Tab`/`Shift-Tab`으로 들여쓰기·내어쓰기(목록 밖에서는 기본 포커스 이동 동작을 그대로 둔다)
 - 목록·인용문·작업 목록에서 `Enter`로 다음 줄에 같은 마크업을 자동으로 이어 쓴다(CodeMirror `@codemirror/lang-markdown` 기본 동작)
 
+읽기/편집 모드:
+
+- 기존 노트를 열면 읽기 모드(`readOnly`), '새 노트'로 만든 노트는 편집 모드로 열린다. 상단 오른쪽 '편집/읽기' 버튼으로 전환한다(`App.tsx`의 `editingPath`).
+- 읽기 모드에서는 커서 위치와 무관하게 원문을 드러내지 않고(`selectionTouches`가 `state.readOnly`면 false), 일반 링크는 일반 클릭으로 새 탭에서 연다.
+- 한국어 조사가 붙는 강조(`**'강조'**는`, `**암묵지(Tacit)**를`)는 CommonMark 규칙상 강조가 아니지만, `CjkEmphasis` 확장이 CJK 문자를 공백처럼 취급해 굵게·취소선·형광펜으로 렌더링한다(`@lezer/markdown` 내부 `inlineParsers`/`parts`에 의존).
+- 표 셀 안의 `<br>`만 줄바꿈으로 렌더링하며, 그 밖의 raw HTML은 계속 텍스트로 표시한다.
+
 상호작용 원칙:
 
 - 렌더링된 요소를 일반 클릭하면 원문 편집 상태로 돌아간다.
@@ -236,7 +243,7 @@ npm run lint
 npm run build
 ```
 
-마지막 확인 결과는 테스트 11개 파일, 총 93개 테스트 통과와 프로덕션 빌드 성공이다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
+마지막 확인 결과는 테스트 14개 파일, 총 119개 테스트 통과와 프로덕션 빌드 성공이다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 
