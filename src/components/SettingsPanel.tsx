@@ -1,11 +1,11 @@
 import { useEffect, useId, useState } from 'react';
-import { Cloud, Palette, RotateCcw, X } from 'lucide-react';
+import { Cloud, Send, Palette, RotateCcw, X } from 'lucide-react';
 import { AppearanceSettingsSection } from './AppearanceSettings';
 import { OllamaSettingsSection } from './OllamaSettings';
 import { defaultAppearance, type AppearanceSettings } from '../lib/settings/appearance';
 import type { OllamaServerSettings } from '../lib/ai/ollamaCloud';
 
-export type SettingsTab = 'appearance' | 'ollama';
+export type SettingsTab = 'appearance' | 'ollama' | 'blog';
 
 interface SettingsPanelProps {
   appearance: AppearanceSettings;
@@ -70,23 +70,52 @@ export function SettingsPanel({
           >
             <Cloud size={15} /> Ollama Cloud
           </button>
+          <button type="button" role="tab" id="settings-tab-blog" aria-selected={tab === 'blog'} className="settings-tab" onClick={() => setTab('blog')}><Send size={15} /> 블로그</button>
         </div>
 
-        <div className="settings-content" role="tabpanel" aria-labelledby={tab === 'appearance' ? 'settings-tab-appearance' : 'settings-tab-ollama'}>
+        <div className="settings-content" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
           {tab === 'appearance'
             ? <AppearanceSettingsSection settings={appearance} onChange={onAppearanceChange} />
-            : <OllamaSettingsSection settings={ollama} onUpdated={onOllamaUpdated} />}
+            : tab === 'ollama' ? <OllamaSettingsSection settings={ollama} onUpdated={onOllamaUpdated} /> : <BlogSettingsSection />}
         </div>
 
         <footer className="settings-footer">
           {tab === 'appearance' ? (
             <button type="button" onClick={() => onAppearanceChange(defaultAppearance)}><RotateCcw size={15} /> 기본값 복원</button>
           ) : (
-            <span className="settings-footer-note">API 키와 모델은 서버에 저장됩니다.</span>
+            <span className="settings-footer-note">API 키는 서버에 저장됩니다.</span>
           )}
           <button type="button" className="settings-done" onClick={onClose}>완료</button>
         </footer>
       </section>
     </div>
   );
+}
+
+function BlogSettingsSection() {
+  const [hasKey, setHasKey] = useState(false);
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => { void fetch('/api/blog/settings').then((response) => response.json()).then((body: { hasApiKey: boolean }) => setHasKey(body.hasApiKey)).catch(() => setMessage('설정을 불러오지 못했습니다.')); }, []);
+  const save = async (apiKey: string | null) => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/blog/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey }) });
+      const body = await response.json() as { hasApiKey?: boolean; error?: string };
+      if (!response.ok) throw new Error(body.error ?? '저장하지 못했습니다.');
+      setHasKey(body.hasApiKey === true);
+      setKey('');
+      setMessage('저장했습니다.');
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : '저장하지 못했습니다.'); }
+    finally { setBusy(false); }
+  };
+  return <fieldset className="settings-section"><legend><Send size={16} /> blog.kerydos.com</legend>
+    <p className="settings-help">블로그 서버의 PUBLISH_TOKEN을 입력하세요. {hasKey ? '키가 설정되어 있습니다.' : '키가 설정되지 않았습니다.'}</p>
+    <label className="model-row"><span>발행 API 키</span><input className="settings-input" type="password" autoComplete="off" value={key} onChange={(event) => setKey(event.target.value)} placeholder={hasKey ? '새 키로 교체' : 'API 키 입력'} /></label>
+    <button type="button" className="fetch-button" disabled={busy || !key.trim()} onClick={() => void save(key)}>저장</button>
+    {hasKey ? <button type="button" className="key-remove" disabled={busy} onClick={() => void save(null)}>저장된 키 삭제</button> : null}
+    {message ? <p className="model-status" role="status">{message}</p> : null}
+  </fieldset>;
 }

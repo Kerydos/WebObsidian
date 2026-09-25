@@ -9,7 +9,20 @@ function parentOf(path: string): string {
   return separator === -1 ? '' : path.slice(0, separator);
 }
 
-export function buildVaultTree(entries: VaultEntry[], folders: VaultFolderEntry[]): VaultTreeRow[] {
+export type NoteSortOrder = 'created' | 'modified' | 'name';
+
+const noteComparators: Record<NoteSortOrder, (a: VaultEntry, b: VaultEntry) => number> = {
+  created: (a, b) => (b.createdAt ?? b.modifiedAt) - (a.createdAt ?? a.modifiedAt),
+  modified: (a, b) => b.modifiedAt - a.modifiedAt,
+  name: (a, b) => a.path.localeCompare(b.path),
+};
+
+export function buildVaultTree(
+  entries: VaultEntry[],
+  folders: VaultFolderEntry[],
+  sortOrder: NoteSortOrder = 'name',
+  collapsed: ReadonlySet<string> = new Set(),
+): VaultTreeRow[] {
   const folderPaths = new Set(folders.map((folder) => folder.path));
   for (const entry of entries) {
     const segments = entry.path.split('/');
@@ -38,9 +51,9 @@ export function buildVaultTree(entries: VaultEntry[], folders: VaultFolderEntry[
   const walk = (parent: string, depth: number) => {
     for (const path of (childFolders.get(parent) ?? []).sort((a, b) => a.localeCompare(b))) {
       rows.push({ kind: 'folder', path, name: path.slice(path.lastIndexOf('/') + 1), depth });
-      walk(path, depth + 1);
+      if (!collapsed.has(path)) walk(path, depth + 1);
     }
-    for (const entry of (childNotes.get(parent) ?? []).sort((a, b) => a.path.localeCompare(b.path))) {
+    for (const entry of (childNotes.get(parent) ?? []).sort(noteComparators[sortOrder])) {
       rows.push({ kind: 'note', entry, depth });
     }
   };

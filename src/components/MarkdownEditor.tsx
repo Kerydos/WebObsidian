@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
@@ -12,16 +12,34 @@ interface MarkdownEditorProps {
   onChange: (value: string) => void;
   onNavigateWikiLink?: (target: string) => void;
   onSentenceCommitted?: (sentence: string) => void;
+  onScrollLine?: (line: number) => void;
+  onReady?: (scrollToLine: ((line: number) => void) | null) => void;
 }
 
-export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onSentenceCommitted }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onSentenceCommitted, onScrollLine, onReady }: MarkdownEditorProps) {
   const navigateRef = useRef(onNavigateWikiLink);
   const sentenceCommittedRef = useRef(onSentenceCommitted);
   // 콜백은 커밋 이후 에디터 이벤트에서만 호출되므로, 커밋 시점에 최신 값을 담는다.
   useEffect(() => {
     navigateRef.current = onNavigateWikiLink;
     sentenceCommittedRef.current = onSentenceCommitted;
+    scrollLineRef.current = onScrollLine;
+    readyRef.current = onReady;
   });
+  const scrollLineRef = useRef(onScrollLine);
+  const readyRef = useRef(onReady);
+  const [view, setView] = useState<EditorView | null>(null);
+  useEffect(() => {
+    if (!view) return;
+    const updateLine = () => scrollLineRef.current?.(view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop + 80).from).number);
+    view.scrollDOM.addEventListener('scroll', updateLine, { passive: true });
+    readyRef.current?.((line) => view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(line).from, { y: 'start', yMargin: 40 }) }));
+    updateLine();
+    return () => {
+      view.scrollDOM.removeEventListener('scroll', updateLine);
+      readyRef.current?.(null);
+    };
+  }, [view]);
   const extensions = useMemo(
     () => [
       markdown({ base: markdownLanguage, extensions: [Highlight, CjkEmphasis] }),
@@ -59,6 +77,7 @@ export default function MarkdownEditor({ value, readOnly = false, onChange, onNa
       value={value}
       extensions={extensions}
       onChange={onChange}
+      onCreateEditor={setView}
       readOnly={readOnly}
       editable={!readOnly}
       autoFocus={!readOnly}

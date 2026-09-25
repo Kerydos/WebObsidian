@@ -11,6 +11,7 @@ export interface NoteIndex {
   title: string;
   tags: string[];
   links: WikiLink[];
+  headings: { level: number; text: string; line: number }[];
 }
 
 const WIKI_LINK = /(!?)\[\[([^[\]|#]+)(?:#([^[\]|]+))?(?:\|([^[\]]+))?\]\]/g;
@@ -23,17 +24,24 @@ function withoutInlineCode(line: string): string {
 export function indexMarkdown(path: string, markdown: string): NoteIndex {
   const links: WikiLink[] = [];
   const tags = new Set<string>();
+  const headings: NoteIndex['headings'] = [];
   const lines = markdown.split(/\r?\n/);
   let inFence = false;
+  const frontmatterEnd = lines[0]?.trim() === '---' ? lines.findIndex((line, index) => index > 0 && line.trim() === '---') : -1;
   let title = path.split('/').at(-1)?.replace(/\.md$/i, '') ?? path;
 
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index];
+    if (index <= frontmatterEnd) continue;
     if (/^\s*(```|~~~)/.test(rawLine)) {
       inFence = !inFence;
       continue;
     }
     if (inFence) continue;
+    const atx = /^ {0,3}(#{1,6})(?:[ \t]+|$)(.*)$/.exec(rawLine);
+    if (atx) headings.push({ level: atx[1].length, text: atx[2].replace(/\s+#+\s*$/, '').trim(), line: index + 1 });
+    const setext = rawLine.trim() && /^(=+|-+)\s*$/.exec(lines[index + 1] ?? '');
+    if (setext) headings.push({ level: setext[1][0] === '=' ? 1 : 2, text: rawLine.trim(), line: index + 1 });
     if (title === path.split('/').at(-1)?.replace(/\.md$/i, '') && /^#\s+/.test(rawLine)) {
       title = rawLine.replace(/^#\s+/, '').trim();
     }
@@ -52,7 +60,7 @@ export function indexMarkdown(path: string, markdown: string): NoteIndex {
     for (const match of line.matchAll(TAG)) tags.add(match[2]);
   }
 
-  return { path, title, tags: [...tags], links };
+  return { path, title, tags: [...tags], links, headings };
 }
 
 export function noteKey(value: string): string {

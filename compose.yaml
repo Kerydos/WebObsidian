@@ -6,8 +6,10 @@ services:
     restart: unless-stopped
     environment:
       WEBOBSIDIAN_PASSWORD: ${WEBOBSIDIAN_PASSWORD:?WEBOBSIDIAN_PASSWORD를 설정하세요}
+      WEBOBSIDIAN_BLOG_VAULT_DIR: /data/blog-vault
     volumes:
       - ./vault:/data/vault
+      - ${BLOG_VAULT_DIR:-../blog_with_obsidian_style/vault}:/data/blog-vault:ro
     networks:
       - gototop-net
 

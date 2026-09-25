@@ -1,9 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { VaultChangeBus } from './events.mjs';
 
 const INVALID_SEGMENT = /(^|\/)\.{1,2}(\/|$)|[\\\0]/;
+const CREATED_MAP_FILE = '.webobsidian-created.json';
+
+// 앱이 아직 저장한 적 없는 파일은 birthtime이 실제 생성 시각이다. 파일 시스템이 birthtime을
+// 제공하지 않으면 0이 나오므로 수정 시각으로 대신한다.
+function createdFallback(details) {
+  return details.birthtimeMs ? Math.min(details.birthtimeMs, details.mtimeMs) : details.mtimeMs;
+}
 
 export class VaultError extends Error {
   constructor(message, status = 400) {
@@ -39,29 +46,74 @@ function isInside(root, target) {
   return pathFromRoot === '' || (!pathFromRoot.startsWith(`..${sep}`) && pathFromRoot !== '..');
 }
 
-async function entryFor(filePath, vaultPath, content) {
-  const details = await stat(filePath);
-  const fileContent = content ?? (await readFile(filePath));
-  return {
-    path: vaultPath,
-    name: basename(vaultPath),
-    size: details.size,
-    modifiedAt: details.mtimeMs,
-    revision: revisionOf(fileContent),
-    content: fileContent.toString('utf8'),
-  };
-}
-
 export class FileVault {
   constructor(root) {
     this.root = resolve(root);
     this.writeQueue = Promise.resolve();
     this.changes = new VaultChangeBus();
+    this.createdMapPath = resolve(this.root, CREATED_MAP_FILE);
+    this.created = {};
+    this.createdSaveTimer = null;
   }
 
   async initialize() {
     await mkdir(this.root, { recursive: true });
     this.realRoot = await realpath(this.root);
+    try {
+      const parsed = JSON.parse(await readFile(this.createdMapPath, 'utf8'));
+      if (parsed && typeof parsed === 'object') this.created = parsed;
+    } catch {
+      this.created = {};
+    }
+  }
+
+  // 원자적 저장이 임시 파일을 rename 하므로 파일 시스템의 birthtime은 저장할 때마다 새로 생긴다.
+  // 그래서 노트별 생성 시각은 볼트 루트의 JSON 맵에 따로 보관한다.
+  rememberCreated(vaultPath, fallback) {
+    const known = this.created[vaultPath];
+    if (typeof known === 'number') return known;
+    this.created[vaultPath] = fallback;
+    this.saveCreatedMap();
+    return fallback;
+  }
+
+  rekeyCreated(sourcePrefix, destPrefix) {
+    for (const key of Object.keys(this.created)) {
+      if (key !== sourcePrefix && !key.startsWith(`${sourcePrefix}/`)) continue;
+      this.created[destPrefix + key.slice(sourcePrefix.length)] = this.created[key];
+      delete this.created[key];
+    }
+    this.saveCreatedMap();
+  }
+
+  dropCreated(prefix) {
+    for (const key of Object.keys(this.created)) {
+      if (key === prefix || key.startsWith(`${prefix}/`)) delete this.created[key];
+    }
+    this.saveCreatedMap();
+  }
+
+  saveCreatedMap() {
+    if (this.createdSaveTimer) return;
+    this.createdSaveTimer = setTimeout(() => {
+      this.createdSaveTimer = null;
+      void writeFile(this.createdMapPath, JSON.stringify(this.created), { mode: 0o600 }).catch(() => undefined);
+    }, 200);
+    this.createdSaveTimer.unref?.();
+  }
+
+  async entryFor(filePath, vaultPath, content) {
+    const details = await stat(filePath);
+    const fileContent = content ?? (await readFile(filePath));
+    return {
+      path: vaultPath,
+      name: basename(vaultPath),
+      size: details.size,
+      modifiedAt: details.mtimeMs,
+      createdAt: this.rememberCreated(vaultPath, createdFallback(details)),
+      revision: revisionOf(fileContent),
+      content: fileContent.toString('utf8'),
+    };
   }
 
   resolvePath(path) {
@@ -91,7 +143,13 @@ export class FileVault {
           await scan(itemPath, vaultPath);
         } else if (item.isFile() && item.name.toLowerCase().endsWith('.md')) {
           const details = await stat(itemPath);
-          entries.push({ path: vaultPath, name: item.name, size: details.size, modifiedAt: details.mtimeMs });
+          entries.push({
+            path: vaultPath,
+            name: item.name,
+            size: details.size,
+            modifiedAt: details.mtimeMs,
+            createdAt: this.rememberCreated(vaultPath, createdFallback(details)),
+          });
         }
       }
     };
@@ -131,7 +189,7 @@ export class FileVault {
       if (details.isSymbolicLink()) throw new VaultError('심볼릭 링크에는 접근할 수 없습니다.');
       const realFile = await realpath(filePath);
       if (!isInside(this.realRoot, realFile)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
-      return await entryFor(filePath, vaultPath);
+      return await this.entryFor(filePath, vaultPath);
     } catch (error) {
       if (error?.code === 'ENOENT') throw new VaultError('파일을 찾을 수 없습니다.', 404);
       throw error;
@@ -179,7 +237,7 @@ export class FileVault {
         if (error?.code !== 'ENOENT') throw error;
       });
     }
-    const saved = await entryFor(filePath, vaultPath, Buffer.from(content));
+    const saved = await this.entryFor(filePath, vaultPath, Buffer.from(content));
     this.changes.publish({ type: 'note', action: 'upsert', path: vaultPath, revision: saved.revision });
     return saved;
   }
@@ -202,6 +260,7 @@ export class FileVault {
       throw error;
     }
     await unlink(filePath);
+    this.dropCreated(vaultPath);
     this.changes.publish({ type: 'note', action: 'delete', path: vaultPath });
   }
 
@@ -223,7 +282,7 @@ export class FileVault {
       if (error?.code === 'ENOENT') throw new VaultError('파일을 찾을 수 없습니다.', 404);
       throw error;
     }
-    if (source === destination) return entryFor(source, destVaultPath);
+    if (source === destination) return this.entryFor(source, destVaultPath);
 
     const destExists = await lstat(destination).catch((error) => {
       if (error?.code === 'ENOENT') return null;
@@ -237,7 +296,8 @@ export class FileVault {
     if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
 
     await rename(source, destination);
-    const moved = await entryFor(destination, destVaultPath);
+    this.rekeyCreated(sourceVaultPath, destVaultPath);
+    const moved = await this.entryFor(destination, destVaultPath);
     this.changes.publish({ type: 'note', action: 'move', path: sourceVaultPath, newPath: destVaultPath, revision: moved.revision });
     return moved;
   }
@@ -285,6 +345,7 @@ export class FileVault {
     if (!isInside(this.realRoot, realDestParent)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
 
     await rename(source, destination);
+    this.rekeyCreated(sourceVaultPath, destVaultPath);
     this.changes.publish({ type: 'vault', action: 'reload' });
     return { path: destVaultPath, name: basename(destVaultPath) };
   }
@@ -296,7 +357,7 @@ export class FileVault {
   }
 
   async removeFolderEntry(path) {
-    const { folderPath } = this.resolveFolderPath(path);
+    const { vaultPath, folderPath } = this.resolveFolderPath(path);
     if (folderPath === this.root) throw new VaultError('볼트 루트는 삭제할 수 없습니다.');
     let details;
     try {
@@ -310,6 +371,7 @@ export class FileVault {
     const realFolder = await realpath(folderPath);
     if (!isInside(this.realRoot, realFolder)) throw new VaultError('볼트 밖의 경로에는 접근할 수 없습니다.');
     await rm(folderPath, { recursive: true });
+    this.dropCreated(vaultPath);
     this.changes.publish({ type: 'vault', action: 'reload' });
   }
 }

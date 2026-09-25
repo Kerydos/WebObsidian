@@ -5,6 +5,8 @@ export interface VaultEntry {
   name: string;
   size: number;
   modifiedAt: number;
+  /** 서버 볼트만 제공한다. 없으면 수정 시각으로 대신한다. */
+  createdAt?: number;
 }
 
 export interface VaultDocument extends VaultEntry {

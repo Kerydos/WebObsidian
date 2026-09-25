@@ -7,6 +7,7 @@ import { AuthError, AuthManager, expiredSessionCookie, readSessionToken, session
 import { FileVault, VaultError } from './vault.mjs';
 import { OllamaError, OllamaSettingsStore, proxyOllama, publicSettingsView } from './ollama.mjs';
 import { VaultWatcher } from './watcher.mjs';
+import { BlogError, BlogSettingsStore, listBlogFolders, publishBlog } from './blog.mjs';
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const publicRoot = resolve(process.env.WEBOBSIDIAN_DIST_DIR ?? resolve(projectRoot, 'dist'));
@@ -101,6 +102,8 @@ const ollamaSettings = new OllamaSettingsStore(
   process.env.WEBOBSIDIAN_OLLAMA_SETTINGS_FILE ?? resolve(vaultRoot, '.webobsidian-ollama.json'),
 );
 
+const blogSettings = new BlogSettingsStore(resolve(vaultRoot, '.webobsidian-blog.json'));
+
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
@@ -124,8 +127,27 @@ const server = createServer(async (request, response) => {
         'Set-Cookie': expiredSessionCookie({ secure: secureCookie }),
       });
     }
-    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/ollama/')) && !auth.isAuthenticated(sessionToken)) {
+    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/ollama/') || url.pathname.startsWith('/api/blog/')) && !auth.isAuthenticated(sessionToken)) {
       return sendJson(response, 401, { error: '로그인이 필요합니다.' });
+    }
+    if (url.pathname === '/api/blog/settings') {
+      if (request.method === 'GET') return sendJson(response, 200, { hasApiKey: !!(await blogSettings.read()) });
+      if (request.method === 'PUT') {
+        const body = await readJson(request);
+        await blogSettings.write(body.apiKey);
+        return sendJson(response, 200, { hasApiKey: !!(await blogSettings.read()) });
+      }
+    }
+    if (request.method === 'GET' && url.pathname === '/api/blog/folders') {
+      return sendJson(response, 200, { folders: await listBlogFolders(process.env.WEBOBSIDIAN_BLOG_VAULT_DIR ?? resolve(projectRoot, '../blog_with_obsidian_style/vault')) });
+    }
+    if (request.method === 'POST' && url.pathname === '/api/blog/publish') {
+      const body = await readJson(request);
+      return sendJson(response, 200, await publishBlog({
+        ...body,
+        apiKey: await blogSettings.read(),
+        host: process.env.WEBOBSIDIAN_BLOG_HOST ?? 'http://note-garden:3000',
+      }));
     }
     if (request.method === 'GET' && url.pathname === '/api/vault') {
       const { entries, folders } = await vault.scan();
@@ -203,7 +225,7 @@ const server = createServer(async (request, response) => {
     if (url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'API를 찾을 수 없습니다.' });
     await serveStatic(request, response, url.pathname);
   } catch (error) {
-    const status = error instanceof VaultError || error instanceof AuthError || error instanceof OllamaError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
+    const status = error instanceof VaultError || error instanceof AuthError || error instanceof OllamaError || error instanceof BlogError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
     if (status === 500) console.error(error);
     sendJson(response, status, { error: status === 500 ? '서버 오류가 발생했습니다.' : error.message });
   }

@@ -25,6 +25,15 @@ describe('indexMarkdown', () => {
     expect(result.links.map((link) => link.target)).toEqual(['Visible']);
     expect(result.tags).toEqual(['#visible']);
   });
+
+  it('indexes document headings without frontmatter or fenced code', () => {
+    const result = indexMarkdown('source.md', '---\ntitle: Draft\n---\n# 시작\n```md\n## 숨김\n```\n중간 제목\n---\n### 끝 ###');
+    expect(result.headings).toEqual([
+      { level: 1, text: '시작', line: 4 },
+      { level: 2, text: '중간 제목', line: 8 },
+      { level: 3, text: '끝', line: 10 },
+    ]);
+  });
 });
 
 describe('link resolution', () => {
