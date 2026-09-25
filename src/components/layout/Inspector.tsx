@@ -2,14 +2,18 @@ import { BookOpen, Hash, Link2 } from 'lucide-react';
 import { GrammarCheckPanel } from '../GrammarCheckPanel';
 import type { VaultController } from '../../hooks/useVault';
 import type { GrammarChecker } from '../../hooks/useGrammarChecker';
+import type { NoteIndex } from '../../lib/markdown/indexer';
 
 interface InspectorProps {
   vault: VaultController;
   grammar: GrammarChecker;
   grammarConfigured: boolean;
+  headings: NoteIndex['headings'];
+  activeHeading: number;
+  onJumpToHeading: (line: number) => void;
 }
 
-export function Inspector({ vault, grammar, grammarConfigured }: InspectorProps) {
+export function Inspector({ vault, grammar, grammarConfigured, headings, activeHeading, onJumpToHeading }: InspectorProps) {
   const { activeNote, backlinks, navigateLink, selectNote, setQuery } = vault;
 
   return (
@@ -18,6 +22,20 @@ export function Inspector({ vault, grammar, grammarConfigured }: InspectorProps)
         <div><span>현재 노트</span><strong>{activeNote?.title ?? '선택 없음'}</strong></div>
         <Link2 size={18} />
       </div>
+      <section>
+        <h2>목차 <span>{headings.length}</span></h2>
+        <nav className="toc-list" aria-label="문서 목차">
+          {headings.map((heading, index) => <button
+            key={heading.line}
+            type="button"
+            className={index === activeHeading ? 'active' : ''}
+            aria-current={index === activeHeading ? 'location' : undefined}
+            style={{ paddingLeft: 9 + (heading.level - 1) * 12 }}
+            onClick={() => onJumpToHeading(heading.line)}
+          >{heading.text}</button>)}
+          {headings.length === 0 ? <p className="muted">이 문서에는 헤더가 없습니다.</p> : null}
+        </nav>
+      </section>
       <section>
         <h2>OUTGOING LINKS <span>{activeNote?.links.length ?? 0}</span></h2>
         <div className="link-list">

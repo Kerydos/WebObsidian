@@ -1,10 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { BookOpen, CircleAlert, LoaderCircle } from 'lucide-react';
 import { ServerVaultRepository } from './lib/vault/server';
 import { OpfsVaultRepository } from './lib/vault/opfs';
 import { LoginScreen } from './components/LoginScreen';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { SettingsPanel, type SettingsTab } from './components/SettingsPanel';
+import { BlogPublishDialog } from './components/BlogPublishDialog';
 import { AssistantPanel } from './components/AssistantPanel';
 import { Topbar } from './components/layout/Topbar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -15,10 +17,18 @@ import { useVaultSync } from './hooks/useVaultSync';
 import { useGrammarChecker } from './hooks/useGrammarChecker';
 import { useAppearanceTheme } from './hooks/useAppearanceTheme';
 import { appearanceVariables } from './lib/settings/appearance';
+import { indexMarkdown } from './lib/markdown/indexer';
 import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/settings/ollama';
 import { emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
+const SIDEBAR_WIDTH_STORAGE_KEY = 'webobsidian:sidebarwidth:v1';
+const SIDEBAR_WIDTH_RANGE = { min: 180, max: 560, default: 252 };
+
+function clampSidebarWidth(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return SIDEBAR_WIDTH_RANGE.default;
+  return Math.min(SIDEBAR_WIDTH_RANGE.max, Math.max(SIDEBAR_WIDTH_RANGE.min, Math.round(value)));
+}
 
 type AuthStatus = 'checking' | 'authenticated' | 'anonymous';
 
@@ -62,6 +72,34 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('appearance');
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [publishTarget, setPublishTarget] = useState<{ kind: 'note' | 'folder'; path: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try { return clampSidebarWidth(Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))); }
+    catch { return SIDEBAR_WIDTH_RANGE.default; }
+  });
+  const scrollToHeadingRef = useRef<((line: number) => void) | null>(null);
+  const [readerPosition, setReaderPosition] = useState<{ path: string; line: number }>();
+  const headings = useMemo(() => vault.activePath ? indexMarkdown(vault.activePath, vault.editorValue).headings : [], [vault.activePath, vault.editorValue]);
+  const visibleLine = readerPosition?.path === vault.activePath ? readerPosition?.line ?? 1 : 1;
+  const activeHeading = headings.reduce((active, heading, index) => heading.line <= visibleLine ? index : active, 0);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth)); } catch { /* Session-only setting. */ }
+  }, [sidebarWidth]);
+
+  const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const move = (moveEvent: PointerEvent) => setSidebarWidth(clampSidebarWidth(moveEvent.clientX));
+    const stop = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+      document.body.style.userSelect = '';
+    };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', stop);
+  }, []);
 
   // 서버에 저장된 Ollama Cloud 설정을 불러온다. 과거 버전이 이 브라우저에 저장해 둔 키가
   // 있고 서버에 아직 키가 없으면 한 번만 서버로 이전해 모든 브라우저가 공유하게 한다.
@@ -128,7 +166,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   };
 
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
-  const openSettings = useCallback((tab: SettingsTab = 'appearance') => {
+  const openSettings = useCallback((tab: SettingsTab = 'blog') => {
     setSettingsTab(tab);
     setSettingsOpen(true);
   }, []);
@@ -167,7 +205,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   }, [vault]);
 
   return (
-    <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={appearanceVariables(appearance)}>
+    <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={{ ...appearanceVariables(appearance), '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
       <Topbar
         repositoryName={vault.repository.name}
         saveState={vault.saveState}
@@ -176,26 +214,46 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         onOpenSettings={() => openSettings()}
         onOpenVaultSwitcher={() => setSwitcherOpen(true)}
         onLogout={() => void logout()}
+        activePath={vault.activePath}
+        editing={vault.editing}
+        onToggleEditing={() => vault.setEditingPath(vault.editing ? undefined : vault.activePath)}
+        onPublish={vault.activePath || vault.selectedFolder ? () => setPublishTarget(vault.selectedFolder ? { kind: 'folder', path: vault.selectedFolder } : { kind: 'note', path: vault.activePath! }) : undefined}
+        publishLabel={vault.selectedFolder ? '폴더 발행' : '글 발행'}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((open) => !open)}
       />
-      <Sidebar vault={vault} />
+      <div className="menu-backdrop" data-open={menuOpen} onClick={() => setMenuOpen(false)} />
+      <Sidebar vault={vault} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} onResize={startSidebarResize} onResetWidth={() => setSidebarWidth(SIDEBAR_WIDTH_RANGE.default)} />
       <main className="workspace">
         {vault.loading ? (
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : vault.activePath ? (
           <Suspense fallback={<div className="center-state"><LoaderCircle className="spin" /></div>}>
             <MarkdownEditor
-              key={vault.activePath}
+              key={`${vault.activePath}:${vault.editing}`}
               value={vault.editorValue}
+              readOnly={!vault.editing}
               onChange={vault.setEditorValue}
               onNavigateWikiLink={vault.navigateLink}
               onSentenceCommitted={grammar.checkSentence}
+              onReady={(scrollToLine) => { scrollToHeadingRef.current = scrollToLine; }}
+              onScrollLine={(line) => setReaderPosition((current) => current?.path === vault.activePath && current?.line === line ? current : { path: vault.activePath!, line })}
             />
           </Suspense>
         ) : (
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
         )}
       </main>
-      <Inspector vault={vault} grammar={grammar} grammarConfigured={grammarConfigured} />
+      <Inspector vault={vault} grammar={grammar} grammarConfigured={grammarConfigured} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
+
+      {publishTarget ? <BlogPublishDialog
+        key={`${publishTarget.kind}:${publishTarget.path}`}
+        target={publishTarget.kind === 'folder'
+          ? { kind: 'folder', path: publishTarget.path, notes: [...vault.documents.values()].filter((note) => note.path.startsWith(`${publishTarget.path}/`)).map((note) => ({ path: note.path, content: note.path === vault.activePath ? vault.editorValue : note.content })) }
+          : { kind: 'note', path: publishTarget.path, content: vault.editorValue }}
+        onClose={() => setPublishTarget(null)}
+        onOpenSettings={() => { setPublishTarget(null); openSettings('blog'); }}
+      /> : null}
 
       {vault.error ? (
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{vault.error}</span><button onClick={() => vault.setError(undefined)}>닫기</button></div>

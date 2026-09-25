@@ -40,6 +40,8 @@ export function useVault() {
   const [folders, setFolders] = useState<VaultFolderEntry[]>([]);
   const [documents, setDocuments] = useState<Map<string, VaultDocument>>(() => new Map());
   const [activePath, setActivePath] = useState<string>();
+  const [editingPath, setEditingPath] = useState<string>();
+  const editing = activePath !== undefined && editingPath === activePath;
   const [editorValue, setEditorValue] = useState('');
   const [query, setQuery] = useState('');
   const [saveState, setSaveState] = useState<SaveState>('saved');
@@ -181,7 +183,10 @@ export function useVault() {
 
   const selectNote = useCallback(
     async (path: string) => {
-      if (path === activePathRef.current) return;
+      if (path === activePathRef.current) {
+        setSelectedFolder(null);
+        return;
+      }
       await saveActive();
       const document = documentsRef.current.get(path);
       if (!document) return;
@@ -189,6 +194,7 @@ export function useVault() {
       setEditorValue(document.content);
       setSaveState('saved');
       setQuery('');
+      setSelectedFolder(null);
     },
     [saveActive],
   );
@@ -257,6 +263,7 @@ export function useVault() {
       await db.notes.put({ vault: repository.name, path: newPath, modifiedAt: moved.modifiedAt, content: moved.content });
     })();
     if (activePathRef.current === path) setActivePath(newPath);
+    setEditingPath((current) => current === path ? newPath : current);
   }, [repository]);
 
   const openLocalFolder = async () => {
@@ -297,6 +304,7 @@ export function useVault() {
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
       setActivePath(path);
+      setEditingPath(path);
       setEditorValue(created.content);
       setSaveState('saved');
       startRenameNote(path);
@@ -337,6 +345,7 @@ export function useVault() {
         setActivePath(newPath);
         setEditorValue(moved.content);
       }
+      setEditingPath((current) => current === path ? newPath : current);
     } catch (cause) {
       setError(messageOf(cause));
     }
@@ -481,6 +490,7 @@ export function useVault() {
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
       setActivePath(path);
+      setEditingPath(path);
       setEditorValue(created.content);
       setSaveState('saved');
     } catch (cause) {
@@ -500,6 +510,8 @@ export function useVault() {
     folders,
     documents,
     activePath,
+    editing,
+    setEditingPath,
     editorValue,
     setEditorValue,
     query,
