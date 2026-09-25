@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkGrammar, fetchOllamaSettings, listCloudModels, saveOllamaSettings, streamCloudChat } from './ollamaCloud';
+import { fetchOllamaSettings, listCloudModels, saveOllamaSettings, streamCloudChat } from './ollamaCloud';
 
 const fetchMock = vi.fn();
 const dispatchEvent = vi.fn();
@@ -122,42 +122,5 @@ describe('streamCloudChat', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'model not found' }, 404));
     await expect(streamCloudChat({ model: 'nope', messages: [{ role: 'user', content: 'hi' }] }))
       .rejects.toThrow('model not found');
-  });
-});
-
-describe('checkGrammar', () => {
-  it('sends a non-streaming request and parses a JSON array response', async () => {
-    const issues = [{ original: '되요', suggestion: '돼요', reason: "'되-'와 '되어-'의 준말 구분" }];
-    fetchMock.mockResolvedValueOnce(jsonResponse({ message: { role: 'assistant', content: JSON.stringify(issues) } }));
-
-    await expect(checkGrammar({ model: 'gpt-oss:120b', text: '이렇게 하면 되요.' })).resolves.toEqual(issues);
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/ollama/chat');
-    const parsedBody = JSON.parse(init.body);
-    expect(parsedBody.stream).toBe(false);
-    expect(parsedBody.model).toBe('gpt-oss:120b');
-    expect(parsedBody.messages[1]).toEqual({ role: 'user', content: '이렇게 하면 되요.' });
-  });
-
-  it('extracts a JSON array wrapped in a code fence with surrounding prose', async () => {
-    const content = '검사 결과입니다.\n```json\n[{"original":"않되","suggestion":"안 돼","reason":"부정 표현 오류"}]\n```';
-    fetchMock.mockResolvedValueOnce(jsonResponse({ message: { content } }));
-    await expect(checkGrammar({ model: 'm', text: 't' })).resolves.toEqual([
-      { original: '않되', suggestion: '안 돼', reason: '부정 표현 오류' },
-    ]);
-  });
-
-  it('returns an empty list when there are no issues or the response is unparsable', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ message: { content: '[]' } }));
-    await expect(checkGrammar({ model: 'm', text: 't' })).resolves.toEqual([]);
-
-    fetchMock.mockResolvedValueOnce(jsonResponse({ message: { content: 'not json at all' } }));
-    await expect(checkGrammar({ model: 'm', text: 't' })).resolves.toEqual([]);
-  });
-
-  it('propagates upstream errors', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ error: '저장된 Ollama Cloud API 키가 없습니다.' }, 401));
-    await expect(checkGrammar({ model: 'm', text: 't' })).rejects.toThrow('저장된 Ollama Cloud API 키가 없습니다.');
   });
 });

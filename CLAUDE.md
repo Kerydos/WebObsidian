@@ -37,7 +37,6 @@
 - `src/lib/vault/opfs.ts`: 기존 브라우저 OPFS 저장소 구현
 - `src/hooks/useVault.ts`: 볼트 데이터 흐름 전부(목록/문서 상태, CRUD, 자동 저장, 검색 인덱스, 활성 노트)
 - `src/hooks/useVaultSync.ts`: 서버 변경 이벤트(SSE) 구독과 전체 재조회 디바운스
-- `src/hooks/useGrammarChecker.ts`: 문장 단위 맞춤법 검사 상태와 수정 적용
 - `src/hooks/useAppearanceTheme.ts`: 테마·글꼴 설정 상태와 localStorage 유지
 - `src/components/layout/Topbar.tsx` · `Sidebar.tsx` · `Inspector.tsx`: 상단 바 / 좌측 트리 / 우측 인스펙터
 - `src/components/dialogs/VaultSwitcher.tsx`: 볼트 저장소 전환 모달(상단 vault pill 클릭)

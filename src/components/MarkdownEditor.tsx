@@ -4,25 +4,21 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
 import { livePreview } from './editor/livePreview';
 import { CjkEmphasis, Highlight, listIndentKeymap, timeSnippet } from './editor/markdownExtensions';
-import { sentenceCommitListener } from './editor/sentenceCommit';
 
 interface MarkdownEditorProps {
   value: string;
   readOnly?: boolean;
   onChange: (value: string) => void;
   onNavigateWikiLink?: (target: string) => void;
-  onSentenceCommitted?: (sentence: string) => void;
   onScrollLine?: (line: number) => void;
   onReady?: (scrollToLine: ((line: number) => void) | null) => void;
 }
 
-export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onSentenceCommitted, onScrollLine, onReady }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onScrollLine, onReady }: MarkdownEditorProps) {
   const navigateRef = useRef(onNavigateWikiLink);
-  const sentenceCommittedRef = useRef(onSentenceCommitted);
   // 콜백은 커밋 이후 에디터 이벤트에서만 호출되므로, 커밋 시점에 최신 값을 담는다.
   useEffect(() => {
     navigateRef.current = onNavigateWikiLink;
-    sentenceCommittedRef.current = onSentenceCommitted;
     scrollLineRef.current = onScrollLine;
     readyRef.current = onReady;
   });
@@ -46,8 +42,6 @@ export default function MarkdownEditor({ value, readOnly = false, onChange, onNa
       // 확장은 에디터당 한 번만 생성되므로 최신 콜백은 ref로 전달한다(이벤트 시점에 호출됨).
       // eslint-disable-next-line react-hooks/refs
       livePreview((target) => navigateRef.current?.(target)),
-      // eslint-disable-next-line react-hooks/refs
-      sentenceCommitListener((sentence) => sentenceCommittedRef.current?.(sentence)),
       keymap.of(listIndentKeymap),
       timeSnippet,
       EditorView.lineWrapping,

@@ -1,19 +1,15 @@
 import { BookOpen, Hash, Link2 } from 'lucide-react';
-import { GrammarCheckPanel } from '../GrammarCheckPanel';
 import type { VaultController } from '../../hooks/useVault';
-import type { GrammarChecker } from '../../hooks/useGrammarChecker';
 import type { NoteIndex } from '../../lib/markdown/indexer';
 
 interface InspectorProps {
   vault: VaultController;
-  grammar: GrammarChecker;
-  grammarConfigured: boolean;
   headings: NoteIndex['headings'];
   activeHeading: number;
   onJumpToHeading: (line: number) => void;
 }
 
-export function Inspector({ vault, grammar, grammarConfigured, headings, activeHeading, onJumpToHeading }: InspectorProps) {
+export function Inspector({ vault, headings, activeHeading, onJumpToHeading }: InspectorProps) {
   const { activeNote, backlinks, navigateLink, selectNote, setQuery } = vault;
 
   return (
@@ -62,15 +58,6 @@ export function Inspector({ vault, grammar, grammarConfigured, headings, activeH
           {activeNote?.tags.map((tag) => <button key={tag} onClick={() => setQuery(tag)}><Hash size={12} />{tag.slice(1)}</button>)}
         </div>
       </section>
-      <GrammarCheckPanel
-        enabled={grammar.enabled}
-        onToggle={grammar.setEnabled}
-        configured={grammarConfigured}
-        checking={grammar.checking}
-        error={grammar.error}
-        result={grammar.result}
-        onApply={grammar.apply}
-      />
     </aside>
   );
 }

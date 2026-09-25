@@ -14,7 +14,6 @@ import { Inspector } from './components/layout/Inspector';
 import { VaultSwitcher } from './components/dialogs/VaultSwitcher';
 import { useVault } from './hooks/useVault';
 import { useVaultSync } from './hooks/useVaultSync';
-import { useGrammarChecker } from './hooks/useGrammarChecker';
 import { useAppearanceTheme } from './hooks/useAppearanceTheme';
 import { appearanceVariables } from './lib/settings/appearance';
 import { indexMarkdown } from './lib/markdown/indexer';
@@ -126,15 +125,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     };
   }, []);
 
-  const grammarConfigured = ollama.hasApiKey && ollama.model !== '';
-  const grammar = useGrammarChecker({
-    model: ollama.model,
-    configured: grammarConfigured,
-    activePath: vault.activePath,
-    getEditorValue: () => vault.editorValueRef.current,
-    setEditorValue: vault.setEditorValue,
-  });
-
   useVaultSync({
     repository: vault.repository,
     saveActive: vault.saveActive,
@@ -235,7 +225,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               readOnly={!vault.editing}
               onChange={vault.setEditorValue}
               onNavigateWikiLink={vault.navigateLink}
-              onSentenceCommitted={grammar.checkSentence}
               onReady={(scrollToLine) => { scrollToHeadingRef.current = scrollToLine; }}
               onScrollLine={(line) => setReaderPosition((current) => current?.path === vault.activePath && current?.line === line ? current : { path: vault.activePath!, line })}
             />
@@ -244,7 +233,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
         )}
       </main>
-      <Inspector vault={vault} grammar={grammar} grammarConfigured={grammarConfigured} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
+      <Inspector vault={vault} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
 
       {publishTarget ? <BlogPublishDialog
         key={`${publishTarget.kind}:${publishTarget.path}`}
