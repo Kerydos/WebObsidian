@@ -13,20 +13,6 @@ export type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 
 export type RenameTarget = { kind: 'note'; path: string } | { kind: 'folder'; path: string };
 
-const welcomeNote = `# WebObsidian에 오신 것을 환영합니다
-
-노트는 현재 선택한 볼트 저장소에 Markdown 파일로 저장됩니다.
-
-## 시작하기
-
-- 왼쪽 위의 새 노트 버튼으로 문서를 만드세요.
-- \`[[노트 이름]]\` 형식으로 노트를 연결하세요.
-- 검색창에서 제목, 본문, #태그를 검색하세요.
-- Chromium 브라우저에서는 **로컬 폴더 열기**로 기존 Markdown 볼트를 연결할 수 있습니다.
-
-[[프로젝트 아이디어]] #welcome
-`;
-
 function parentOf(path: string) {
   const separator = path.lastIndexOf('/');
   return separator === -1 ? '' : path.slice(0, separator);
@@ -90,11 +76,7 @@ export function useVault() {
     if (!options.silent) setLoading(true);
     setError(undefined);
     try {
-      let nextEntries = await nextRepository.list();
-      if (nextEntries.length === 0) {
-        await nextRepository.create('Welcome.md', welcomeNote);
-        nextEntries = await nextRepository.list();
-      }
+      const nextEntries = await nextRepository.list();
       const nextFolders = await nextRepository.listFolders();
       const loaded = await Promise.all(nextEntries.map((entry) => nextRepository.read(entry.path)));
       const nextDocuments = new Map(loaded.map((document) => [document.path, document]));
