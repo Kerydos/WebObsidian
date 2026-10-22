@@ -1,6 +1,8 @@
 import { createReadStream } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { connect } from 'node:net';
+import { homedir } from 'node:os';
 import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AuthError, AuthManager, expiredSessionCookie, readSessionToken, sessionCookie } from './auth.mjs';
@@ -11,11 +13,13 @@ import { BlogError, BlogSettingsStore, listBlogFolders, publishBlog } from './bl
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const publicRoot = resolve(process.env.WEBOBSIDIAN_DIST_DIR ?? resolve(projectRoot, 'dist'));
-const vaultRoot = resolve(process.env.WEBOBSIDIAN_VAULT_DIR ?? resolve(projectRoot, 'vault'));
+const vaultRoot = resolve(process.env.WEBOBSIDIAN_VAULT_DIR ?? resolve(homedir(), 'Documents', 'SecondBrain'));
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '127.0.0.1';
 const secureCookie = process.env.WEBOBSIDIAN_SECURE_COOKIE === 'true' || process.env.NODE_ENV === 'production';
 const maxBodySize = 10 * 1024 * 1024;
+// 웹 터미널: 호스트에서 실행되는 terminal-host 데몬의 유닉스 소켓(비어 있으면 기능 비활성).
+const terminalSocket = process.env.WEBOBSIDIAN_TERMINAL_SOCKET ?? '';
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -229,6 +233,24 @@ const server = createServer(async (request, response) => {
     if (status === 500) console.error(error);
     sendJson(response, status, { error: status === 500 ? '서버 오류가 발생했습니다.' : error.message });
   }
+});
+
+// 웹 터미널 WebSocket: 세션 쿠키를 확인한 뒤 업그레이드 요청을 호스트 데몬 소켓으로 그대로 흘려보낸다.
+server.on('upgrade', (request, socket, head) => {
+  const refuse = (status, text) => socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\n\r\n`);
+  const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+  if (url.pathname !== '/api/terminal') return refuse(404, 'Not Found');
+  if (!auth.isAuthenticated(readSessionToken(request.headers.cookie))) return refuse(401, 'Unauthorized');
+  if (!terminalSocket) return refuse(503, 'Terminal Disabled');
+  const upstream = connect(terminalSocket);
+  upstream.on('connect', () => {
+    const headers = Object.entries(request.headers).map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : value}`);
+    upstream.write(`${request.method} ${request.url} HTTP/${request.httpVersion}\r\n${headers.join('\r\n')}\r\n\r\n`);
+    if (head.length) upstream.write(head);
+    socket.pipe(upstream).pipe(socket);
+  });
+  upstream.on('error', () => refuse(503, 'Terminal Unavailable'));
+  socket.on('error', () => upstream.destroy());
 });
 
 server.listen(port, host, () => {

@@ -649,7 +649,7 @@ function buildDecorationParts(
 
   for (const element of buildLivePreviewModel(state, visibleRanges)) {
     if (element.kind === 'heading') {
-      addInline(element.lineFrom, element.lineFrom, Decoration.line({ class: `cm-live-h${element.level}` }));
+      addInline(element.lineFrom, element.lineFrom, Decoration.line({ class: `cm-live-h${element.level} HyperMD-header HyperMD-header-${element.level}` }));
       if (!element.active) {
         if (element.setext) {
           const markerLine = state.doc.lineAt(element.marker.from);

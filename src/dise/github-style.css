@@ -1,0 +1,374 @@
+/* ============================================================
+   DISE Vault — GitHub-style Theme
+   GitHub 웹사이트(github.com markdown-body)의 폰트/색상/여백/
+   코드블록/테이블/인용문/링크/구분선 스타일을 재현합니다.
+   헤더(h1~h6) 사이즈·컬러는 headings-blue.css 에서 별도 관리합니다.
+   ============================================================ */
+
+/* ── 라이트 모드 색상 변수 (GitHub Light) ──
+   본문(마크다운 편집/읽기 영역)에만 적용되도록 .workspace-leaf-content[data-type="markdown"]
+   로 범위를 좁힘. .theme-light 전체에 걸면 사이드바·리본·버튼 등 앱 UI 전역 변수까지
+   덮어써서 iterm2-interface.css의 인터페이스 색상, 사용자가 지정한 accentColor를
+   침범하게 되므로 반드시 이 범위를 유지할 것. ── */
+.theme-light .workspace-leaf-content[data-type="markdown"] {
+  --text-normal: #1f2328;
+  --text-muted: #656d76;
+  --text-faint: #6e7781;
+  --background-primary: #ffffff;
+  --background-primary-alt: #f6f8fa;
+  --background-secondary: #f6f8fa;
+  --background-secondary-alt: #eaeef2;
+  --background-modifier-border: #d0d7de;
+  /* 위키링크([[ ]])·내부링크: 본문 글자색에 블루를 소량만 섞어 본문과 어울리게 */
+  --link-color: color-mix(in oklab, var(--text-normal) 72%, #0969da 28%);
+  --link-color-hover: #0550ae;
+  --link-external-color: #0969da;  /* 외부 링크는 구분이 필요하므로 블루 유지 */
+  --text-selection: #b6e3ff;
+  --code-background: #f6f8fa;
+  --code-normal: #1f2328;
+  --blockquote-border-color: #d0d7de;
+  --interactive-accent: #0969da;
+  --interactive-accent-hover: #0550ae;
+}
+
+/* ── 다크 모드 색상 변수 (GitHub Dark, 실제 GitHub 값 기준으로 가독성 보정) ──
+   위와 동일한 이유로 본문 영역에만 스코프. ── */
+.theme-dark .workspace-leaf-content[data-type="markdown"] {
+  --text-normal: #e6edf3;
+  --text-muted: #9198a1;         /* GitHub 실제 fgColor-muted, 기존보다 밝게 보정 */
+  --text-faint: #7d8590;
+  --background-primary: #0d1117;
+  --background-primary-alt: #161b22;
+  --background-secondary: #161b22;
+  --background-secondary-alt: #21262d;
+  --background-modifier-border: #3d444d;   /* GitHub 실제 borderColor-default, 시인성 향상 */
+  /* 위키링크([[ ]])·내부링크: 본문 글자색에 블루를 소량만 섞어 본문과 어울리게 */
+  --link-color: color-mix(in oklab, var(--text-normal) 72%, #4493f8 28%);
+  --link-color-hover: #79c0ff;
+  --link-external-color: #4493f8;  /* 외부 링크는 구분이 필요하므로 블루 유지 */
+  --text-selection: #264f78;
+  --code-background: #1c2128;    /* 본문 배경보다 한 단계 밝게 하여 코드 영역 구분감 강화 */
+  --code-normal: #e6edf3;
+  --blockquote-border-color: #3d444d;
+  --interactive-accent: #4493f8;
+  --interactive-accent-hover: #79c0ff;
+}
+
+/* ── 다크 모드 전용 가독성 보정: 하이라이트/체크박스/콜아웃 ── */
+.theme-dark .markdown-rendered mark,
+.theme-dark mark {
+  background-color: #bb800966 !important; /* 어두운 배경에서도 눈에 띄는 톤 다운된 노랑 */
+  color: #e6edf3 !important;
+}
+.theme-dark .task-list-item-checkbox {
+  border: 1px solid var(--text-muted) !important;
+}
+.theme-dark .markdown-rendered .callout {
+  background-color: var(--background-primary-alt) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
+.theme-dark .markdown-rendered img {
+  border-radius: 4px;
+}
+
+
+/* ── 본문 폰트: 옵시디언 설정의 본문 폰트를 사용 ── */
+.markdown-rendered,
+.markdown-source-view,
+.cm-editor {
+  /* 폰트는 설정 → 모양 → 본문 폰트(textFontFamily) 값을 그대로 따름.
+     예전에는 여기서 폰트 목록을 !important 로 고정해 설정값이 무시됐음 */
+  font-family: var(--font-text) !important;
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+/* ── 본문 문단 간격 ── */
+.markdown-rendered p,
+.markdown-source-view .cm-line,
+.markdown-rendered li,
+.markdown-rendered blockquote {
+  line-height: 1.5 !important;
+}
+
+/* ── 링크 ──
+   위키링크([[ ]])·내부링크는 본문 글자색에 가까운 --link-color 로 표시해 본문 흐름을
+   해치지 않게 하고, hover 시에만 뚜렷한 블루로 바뀌어 링크임이 드러나게 함.
+   외부 링크는 눈에 띄어야 하므로 --link-external-color(GitHub 블루)를 유지. ── */
+.markdown-rendered a,
+.cm-link,
+.cm-hmd-internal-link {
+  color: var(--link-color) !important;
+  text-decoration: none !important;
+}
+
+/* ── 모든 링크의 밑줄 제거 ──
+   Obsidian은 밑줄을 text-decoration 단축 속성이 아니라
+   text-decoration-line: var(--link-decoration) 형태로 그리므로, 변수 자체를 none 으로
+   두는 것이 가장 확실하다.
+   특히 편집 모드(Live Preview)의 밑줄은 .cm-hmd-internal-link 의 "자식"인
+   .cm-underline 에 걸리기 때문에, 부모 요소에 text-decoration: none 을 줘도
+   지워지지 않는다(자식이 자기 밑줄을 그림). 변수로 처리해야 하는 이유. ── */
+.workspace-leaf-content[data-type="markdown"] {
+  --link-decoration: none;
+  --link-decoration-hover: none;
+  --link-external-decoration: none;
+  --link-external-decoration-hover: none;
+}
+.markdown-rendered a:hover {
+  color: var(--link-color-hover) !important;
+  text-decoration: none !important;
+}
+
+/* 위 .markdown-rendered a 규칙이 외부 링크까지 잡으므로, 특이도를 한 단계 높여 되돌림 */
+.markdown-rendered a.external-link {
+  color: var(--link-external-color) !important;
+}
+.markdown-rendered a.external-link:hover {
+  color: var(--link-color-hover) !important;
+}
+
+/* ── 인라인 코드: GitHub 실제 값 (padding .2em .4em, font-size 85%, bg-neutral-muted, radius 6px) ── */
+.markdown-rendered code,
+.markdown-rendered tt,
+.cm-inline-code {
+  background-color: var(--code-background) !important;
+  color: var(--code-normal) !important;
+  border-radius: 6px;
+  padding: 0.2em 0.4em;
+  font-size: 85%;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace !important;
+}
+
+/* ── 코드블록: GitHub 실제 값 (padding 16px, font-size 85%, line-height 1.45, bg-muted, radius 6px) ── */
+.markdown-rendered pre,
+.HyperMD-codeblock-bg,
+.cm-s-obsidian .HyperMD-codeblock {
+  background-color: var(--code-background) !important;
+  border-radius: 6px;
+}
+.markdown-rendered pre {
+  padding: 16px;
+  overflow: auto;
+  line-height: 1.45;
+}
+.markdown-rendered pre code {
+  background-color: transparent !important;
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  line-height: inherit;
+  border: 0;
+  white-space: pre;
+}
+
+/* ── 인용문(blockquote): GitHub 실제 값 기반 + 연한 블루톤 배경 박스 ── */
+.markdown-rendered blockquote {
+  border-left: 0.25em solid var(--interactive-accent) !important;
+  color: var(--text-muted) !important;
+  padding: 0.6em 1em;
+  margin: 0.8em 0;
+  background-color: var(--background-primary-alt) !important;
+  border-radius: 0 6px 6px 0;
+}
+.markdown-rendered blockquote > :first-child {
+  margin-top: 0;
+}
+.markdown-rendered blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── 테이블: GitHub 실제 값 (th 굵게, td/th padding 10px 22px, 테두리, 줄무늬, tr 상단 테두리) ── */
+/* 표는 부모 본문 폭을 채우고 왼쪽에 정렬한다.
+   목록 안의 표는 li의 들여쓰기와 남은 폭을 그대로 따른다. */
+.markdown-rendered table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  display: table;
+  width: 100%;
+  margin: 1em 0;
+  box-sizing: border-box;
+}
+/* 읽기 모드: 열이 많아 본문 폭을 넘는 표는 표 바깥 래퍼에서 가로 스크롤 */
+.markdown-preview-view .el-table {
+  overflow-x: auto;
+}
+/* 편집 모드(Live Preview): 위젯 내부 폭을 채우고 왼쪽 정렬 */
+.markdown-source-view.mod-cm6 .cm-table-widget .table-wrapper {
+  display: block;
+  width: 100%;
+}
+.markdown-source-view.mod-cm6 .cm-table-widget table {
+  display: table;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* [수정] 헤더(th) 줄바꿈 금지 — 읽기 모드 + 편집 모드 공통 */
+.markdown-rendered table th,
+.markdown-rendered table th *,
+.markdown-source-view.mod-cm6 .cm-table-widget th,
+.markdown-source-view.mod-cm6 .cm-table-widget th * {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+/* 헤더 셀을 직접 편집 중일 때(셀 내부 에디터)는 공백 표시 보존(pre = 줄바꿈 없음) */
+.markdown-source-view.mod-cm6 .cm-table-widget th .cm-content,
+.markdown-source-view.mod-cm6 .cm-table-widget th .cm-line {
+  white-space: pre !important;
+}
+
+/* [수정] 본문 셀(td) 한글 단어 단위 줄바꿈 — 읽기 모드 + 편집 모드 공통
+   - keep-all: 한글도 띄어쓰기(어절) 단위로만 줄바꿈 (글자 중간에서 끊기지 않음)
+   - break-word: 띄어쓰기 없는 아주 긴 문자열(URL 등)만 칸을 넘칠 때 예외적으로 끊음
+   - 편집 모드 기본값(overflow-wrap: anywhere)은 글자 단위로 끊기므로 덮어씀 */
+.markdown-rendered table td,
+.markdown-rendered table td *,
+.markdown-source-view.mod-cm6 .cm-table-widget td,
+.markdown-source-view.mod-cm6 .cm-table-widget td * {
+  word-break: keep-all !important;
+  overflow-wrap: break-word !important;
+}
+
+/* [수정] 가장 왼쪽 열(첫 번째 칸)은 가운데 정렬 — 읽기 모드 + 편집 모드 공통
+   - 마크다운 정렬 문법(:---)으로 지정된 인라인 정렬보다 우선하도록 !important */
+.markdown-rendered table td:first-child,
+.markdown-rendered table td:first-child *,
+.markdown-source-view.mod-cm6 .cm-table-widget td:first-child,
+.markdown-source-view.mod-cm6 .cm-table-widget td:first-child * {
+  text-align: center !important;
+}
+
+/* 읽기 모드(Reading view) 셀 여백: 첫/마지막 열 포함 모든 셀에 동일 적용 */
+.markdown-rendered table th,
+.markdown-rendered table td {
+  border: 1px solid var(--background-modifier-border) !important;
+  padding: 3px !important;
+  box-sizing: border-box;
+}
+
+/* 편집 모드(Live Preview) 테이블 위젯 셀 여백: 래퍼(.table-cell-wrapper) 기준으로 동일 적용 */
+.markdown-source-view.mod-cm6 .cm-table-widget td,
+.markdown-source-view.mod-cm6 .cm-table-widget th,
+.markdown-source-view.mod-cm6 .cm-table-widget .table-cell-wrapper {
+  padding: 3px !important;
+}
+
+.markdown-rendered table th {
+  font-weight: 700;
+  font-size: calc(1em + 1px);
+  background-color: var(--background-secondary) !important;
+  text-align: center;
+}
+
+/* [수정] 표 상단 제목(th) 가운데 정렬 — 읽기 모드 + 편집 모드 공통
+   - 마크다운 정렬 문법(:--- / ---:)의 인라인 정렬보다 우선하도록 !important
+   - 편집 모드는 셀 내부 에디터(.cm-line 등)까지 함께 정렬 */
+.markdown-rendered table th,
+.markdown-rendered table th *,
+.markdown-source-view.mod-cm6 .cm-table-widget th,
+.markdown-source-view.mod-cm6 .cm-table-widget th .table-cell-wrapper,
+.markdown-source-view.mod-cm6 .cm-table-widget th .cm-content,
+.markdown-source-view.mod-cm6 .cm-table-widget th .cm-line {
+  text-align: center !important;
+}
+.markdown-rendered table tr {
+  background-color: var(--background-primary) !important;
+  border-top: 1px solid var(--background-modifier-border) !important;
+}
+
+/* ── 수평선(hr): GitHub 실제 값 (height .25em, margin 24px 0) ── */
+.markdown-rendered hr {
+  border: none;
+  height: 0.25em;
+  padding: 0;
+  background-color: var(--background-modifier-border);
+  margin: 24px 0;
+}
+
+/* ── 리스트: GitHub 실제 값 (padding-left 2em) ── */
+.markdown-rendered ul,
+.markdown-rendered ol {
+  padding-left: 2em;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.markdown-rendered ul ul,
+.markdown-rendered ul ol,
+.markdown-rendered ol ol,
+.markdown-rendered ol ul {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.markdown-rendered li + li {
+  margin-top: 0.25em;
+}
+.markdown-rendered li > p {
+  margin-top: 16px;
+}
+
+/* ── 체크박스(task list): GitHub 스타일 ── */
+.markdown-rendered .task-list-item {
+  list-style-type: none;
+}
+.markdown-rendered .task-list-item-checkbox {
+  border-radius: 3px;
+  margin: 0 0.2em 0.25em -1.4em;
+  vertical-align: middle;
+}
+
+/* ── 완료된 체크박스 항목: 본문보다 흐리게(연하게) 표시 ── */
+.markdown-rendered li.task-list-item.is-checked,
+.markdown-rendered li.task-list-item.is-checked > *,
+.markdown-source-view .HyperMD-task-line.task-list-item-checked,
+.cm-line.HyperMD-task-line.cm-strong.task-list-item-checked {
+  color: var(--text-faint) !important;
+  opacity: 0.6;
+}
+.markdown-rendered li.task-list-item.is-checked code,
+.markdown-rendered li.task-list-item.is-checked a {
+  color: inherit !important;
+}
+
+/* ── 강조 텍스트 ── */
+.markdown-rendered strong {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+/* ── 선택 영역 하이라이트 ── */
+.markdown-rendered ::selection,
+.cm-editor ::selection {
+  background-color: var(--text-selection) !important;
+}
+
+/* ── 본문 하단 여유 공백 (3줄) ──
+   Obsidian 데스크톱의 상태바(.status-bar)는 창 우측 하단에 position: fixed 로
+   떠 있어서, 문서 맨 끝에서 입력 중인 줄을 가린다.
+   편집(Live Preview/Source) 및 읽기 모드 본문 끝에 빈 블록을 붙여
+   마지막 줄이 상태바 위로 올라오도록 3줄 높이만큼 스크롤 여유를 준다.
+   (padding 을 덮어쓰지 않고 ::after 로 추가하므로 기존 여백은 그대로 유지) ── */
+.markdown-source-view.mod-cm6 .cm-sizer::after,
+.markdown-preview-view .markdown-preview-sizer::after {
+  content: "";
+  display: block;
+  height: calc(var(--line-height-normal) * 3em);
+}
+
+/* ── [수정] 플로우차트(Mermaid) 가운데 정렬 — 읽기 모드 + 편집 모드 공통 ──
+   Mermaid 는 <div class="mermaid"><svg style="max-width:…"></svg></div> 로 그려지는데
+   svg 가 기본적으로 왼쪽에 붙으므로, 블록으로 바꾼 뒤 좌우 여백 auto 로 가운데 배치.
+   (max-width 는 Mermaid 가 그림 크기에 맞춰 넣는 값이라 그대로 둠) */
+.markdown-rendered .mermaid,
+.markdown-source-view.mod-cm6 .cm-preview-code-block .mermaid {
+  text-align: center;
+}
+.markdown-rendered .mermaid > svg,
+.markdown-source-view.mod-cm6 .cm-preview-code-block .mermaid > svg {
+  display: block;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}

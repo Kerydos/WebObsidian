@@ -1,0 +1,50 @@
+/* Agent Client 0.13: style tool rows; permission prompts remain unchanged. */
+body .agent-client-message-tool-call-title:has(.agent-client-message-tool-call-icon :is(.lucide-square-terminal, .lucide-terminal-square)):not(:has(.agent-client-status-failed)) .agent-client-message-tool-call-title-text {
+  font-size: 0;
+}
+body .agent-client-message-tool-call-title:has(.agent-client-message-tool-call-icon :is(.lucide-square-terminal, .lucide-terminal-square)):not(:has(.agent-client-status-failed)) .agent-client-message-tool-call-title-text::before {
+  content: "C:\\>";
+  display: inline-block;
+  padding: 3px 7px;
+  background: #101510;
+  color: #b3e7a0;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+body .agent-client-message-tool-call-title:has(.agent-client-message-tool-call-icon :is(.lucide-square-terminal, .lucide-terminal-square)):has(.agent-client-status-in_progress) .agent-client-message-tool-call-title-text::after {
+  content: "\2588";
+  display: inline-block;
+  padding: 3px 7px 3px 0;
+  background: #101510;
+  color: #b3e7a0;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+  animation: dise-dos-cursor 1s steps(1, end) infinite;
+}
+body .agent-client-message-tool-call-title:has(.agent-client-message-tool-call-icon :is(.lucide-square-terminal, .lucide-terminal-square)):has(.agent-client-status-in_progress) .agent-client-message-tool-call-status-icon {
+  visibility: hidden;
+}
+body .agent-client-message-tool-call-title:has(.agent-client-status-in_progress) .agent-client-message-tool-call-icon .lucide-pencil {
+  transform-origin: 25% 85%;
+  animation: dise-pen-writing 0.85s ease-in-out infinite;
+  color: var(--interactive-accent);
+}
+@keyframes dise-dos-cursor {
+  0%, 49% { color: #b3e7a0; }
+  50%, 100% { color: transparent; }
+}
+@keyframes dise-pen-writing {
+  0%, 100% { transform: translate(0, 0) rotate(-10deg); }
+  25% { transform: translate(2px, -1px) rotate(5deg); }
+  50% { transform: translate(4px, 0) rotate(-10deg); }
+  75% { transform: translate(1px, -2px) rotate(5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .agent-client-message-tool-call-title .agent-client-message-tool-call-title-text::after,
+  body .agent-client-message-tool-call-title .agent-client-message-tool-call-icon .lucide-pencil {
+    animation: none !important;
+  }
+}

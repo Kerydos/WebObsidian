@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles } from 'lucide-react';
+import { BookOpen, Bot, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles, SquareTerminal } from 'lucide-react';
 import type { SaveState } from '../../hooks/useVault';
 
 interface TopbarProps {
@@ -6,6 +6,8 @@ interface TopbarProps {
   saveState: SaveState;
   assistantOpen: boolean;
   onToggleAssistant: () => void;
+  terminalOpen: boolean;
+  onToggleTerminal: () => void;
   onOpenSettings: () => void;
   onOpenVaultSwitcher: () => void;
   onLogout: () => void;
@@ -18,7 +20,7 @@ interface TopbarProps {
   onToggleMenu: () => void;
 }
 
-export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssistant, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
+export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssistant, terminalOpen, onToggleTerminal, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -54,6 +56,15 @@ export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssis
           aria-pressed={assistantOpen}
         >
           <Bot size={16} />
+        </button>
+        <button
+          className={terminalOpen ? 'topbar-button active' : 'topbar-button'}
+          onClick={onToggleTerminal}
+          title="웹 터미널"
+          aria-label="웹 터미널 열기"
+          aria-pressed={terminalOpen}
+        >
+          <SquareTerminal size={16} />
         </button>
         <button className="topbar-button" onClick={onOpenSettings} title="설정" aria-label="설정 열기"><Settings2 size={16} /></button>
         <button className="logout-button" onClick={onLogout} title="로그아웃"><LogOut size={15} /><span className="btn-label">로그아웃</span></button>

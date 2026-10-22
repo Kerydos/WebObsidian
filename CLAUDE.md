@@ -23,7 +23,7 @@
 - 브라우저 캐시 및 인덱스: Dexie/IndexedDB
 - 배포: Node 직접 실행 또는 Docker Compose
 
-백엔드는 빌드된 프론트엔드 정적 파일과 인증·Vault API를 함께 제공한다. 마크다운 문서는 `WEBOBSIDIAN_VAULT_DIR`로 지정한 서버 폴더에 저장하며, 기본값은 프로젝트의 `vault/` 폴더다.
+백엔드는 빌드된 프론트엔드 정적 파일과 인증·Vault API를 함께 제공한다. 마크다운 문서는 `WEBOBSIDIAN_VAULT_DIR`로 지정한 서버 폴더에 저장하며, 기본값은 `~/Documents/SecondBrain`(`/home/jarvis/Documents/SecondBrain`)이다. 기존 `vault/` 경로는 다른 에이전트 호환을 위해 새 위치를 가리키는 심볼릭 링크로 남겨 두었다.
 
 ## 주요 파일
 
@@ -49,6 +49,9 @@
 - `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현(콜아웃, 프론트매터, 표 셀 인라인 렌더링 포함)
 - `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵, `::` 시각 삽입 스니펫
 - `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
+- `src/components/TerminalPanel.tsx`: 오른쪽 열에 표시되는 xterm.js 웹 터미널(상단 터미널 버튼으로 토글)
+- `terminal-host/server.mjs`: **호스트에서** 실행되는 웹 터미널 PTY 데몬(node-pty + ws, 유닉스 소켓). Docker 이미지에 포함되지 않는다
+- `terminal-host/webobsidian-terminal.service`: 위 데몬의 systemd user 유닛 파일
 - `compose.yaml`, `Dockerfile`: 컨테이너 배포 설정
 
 ## 개발 환경 실행
@@ -86,22 +89,23 @@ npm start
 ### Docker Compose
 
 ```bash
-mkdir -p vault
+mkdir -p ~/Documents/SecondBrain
 export WEBOBSIDIAN_PASSWORD='충분히 긴 운영 비밀번호'
 docker compose up -d --build
 ```
 
-현재 Compose 설정은 `127.0.0.1:3000`에 바인딩하고 호스트의 `./vault`를 컨테이너의 `/data/vault`에 연결한다. 외부 공개 시에는 Nginx, Caddy 같은 리버스 프록시에서 HTTPS를 종료하고 애플리케이션은 로컬 인터페이스에 유지한다.
+현재 Compose 설정은 `127.0.0.1:3000`에 바인딩하고 호스트의 `${WEBOBSIDIAN_VAULT_HOST_DIR:-$HOME/Documents/SecondBrain}`를 컨테이너의 `/data/vault`에 연결한다. 외부 공개 시에는 Nginx, Caddy 같은 리버스 프록시에서 HTTPS를 종료하고 애플리케이션은 로컬 인터페이스에 유지한다.
 
 ## 환경 변수
 
 - `WEBOBSIDIAN_PASSWORD`: 필수. 최소 12자 단일 관리자 비밀번호
-- `WEBOBSIDIAN_MIN_PASSWORD_LENGTH`: 선택. 비밀번호 최소 길이 완화(기본 12). 개인 테스트 환경용이며 운영에서는 기본값을 유지한다
+- `WEBOBSIDIAN_MIN_PASSWORD_LENGTH`: 선택. 비밀번호 최소 길이(기본 12). 운영 `compose.yaml`에서는 사용자 요청으로 8로 설정되어 있다(2026-10-22)
 - `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
 - `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
 - `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
 - `WEBOBSIDIAN_OLLAMA_HOST`: 선택. Ollama Cloud 프록시의 업스트림 주소(기본값 `https://ollama.com`)
 - `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`: 선택. Ollama Cloud 공유 설정(API 키, 모델) 파일 경로(기본값 vault 안의 `.webobsidian-ollama.json`)
+- `WEBOBSIDIAN_TERMINAL_SOCKET`: 선택. 웹 터미널 호스트 데몬의 유닉스 소켓 경로. 비어 있으면 터미널 기능이 꺼지고 `/api/terminal`은 503을 돌려준다
 - `HOST`: 서버 바인딩 주소
 - `PORT`: 서버 포트
 
@@ -205,7 +209,7 @@ ollama.com의 클라우드 모델(gpt-oss:120b, qwen3.5 등)을 사용하는 AI 
 ### 설정 저장 위치(서버 공유)
 
 - API 키와 모델은 **서버**에 저장되며 로그인한 모든 브라우저에서 함께 사용된다.
-- 저장 파일은 `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`로 변경할 수 있고 기본값은 vault 폴더 안의 `.webobsidian-ollama.json`이다(0600 권한, JSON). 이 파일은 `.md`가 아니므로 노트 목록·vault API·파일 워처 어디에도 노출되지 않고, `/vault/`가 gitignore되어 있어 커밋되지도 않는다. Docker에서 vault 볼륨에 포함되므로 컨테이너 재생성 후에도 유지된다.
+- 저장 파일은 `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`로 변경할 수 있고 기본값은 vault 폴더 안의 `.webobsidian-ollama.json`이다(0600 권한, JSON). 이 파일은 `.md`가 아니므로 노트 목록·vault API·파일 워처 어디에도 노출되지 않고, 볼트가 저장소 밖(`~/Documents/SecondBrain`)에 있어 커밋되지도 않는다. Docker에서 vault 볼륨에 포함되므로 컨테이너 재생성 후에도 유지된다.
 - 설정 조회는 키 원문을 돌려주지 않고 `{ hasApiKey, apiKeyHint(마스킹), model }` 뷰만 제공한다.
 - 과거 버전이 브라우저 localStorage(`webobsidian:ollama:v1`)에 저장하던 키는 앱 시작 시 서버에 키가 없으면 자동으로 서버로 이전된 뒤 삭제한다(`src/lib/settings/ollama.ts` 참고).
 
@@ -234,6 +238,28 @@ ollama.com의 클라우드 모델(gpt-oss:120b, qwen3.5 등)을 사용하는 AI 
 - 어시스턴트 답변은 '노트에 삽입'(현재 노트 끝에 추가, 기존 자동 저장 흐름을 따름)하거나 '복사'할 수 있다.
 - 대화 상태는 메모리에만 유지되며 패널을 닫아도 유지되고, 새로고침하면 사라진다.
 
+## 웹 터미널
+
+상단 바의 터미널 버튼을 누르면 오른쪽 인스펙터 자리에 xterm.js 터미널이 열린다(열려 있을 때 오른쪽 열이 `min(640px, 45vw)`로 넓어진다). 목적은 호스트의 `claude`, `codex` 같은 CLI를 볼트 폴더에서 바로 실행해 노트를 참조·작성하거나 리서치하는 것이다.
+
+구조:
+
+- 브라우저 → `wss://…/api/terminal` → WebObsidian 서버(Docker)가 세션 쿠키를 확인한 뒤 업그레이드 요청을 **그대로** 호스트 데몬의 유닉스 소켓으로 파이프한다(`server/server.mjs`의 `upgrade` 핸들러, 외부 라이브러리 없음). 미인증은 401, 소켓 미설정은 503, 데몬이 꺼져 있으면 503이다.
+- 호스트 데몬 `terminal-host/server.mjs`는 Docker 밖 호스트(KERYON)에서 실행되며 `~/.local/state/webobsidian/terminal.sock`(0600)에서 WebSocket을 받는다. 접속마다 PTY에서 `tmux new-session -A -s webobsidian`을 열므로 브라우저를 닫아도 실행 중인 작업이 유지되고 다시 열면 같은 세션에 붙는다. 작업 디렉터리는 `WEBOBSIDIAN_VAULT_DIR`(기본 `~/Documents/SecondBrain`).
+- `compose.yaml`은 소켓 **디렉터리** `~/.local/state/webobsidian`을 `/run/webobsidian-terminal`로 마운트한다(소켓 파일이 재생성되어도 마운트가 유지되도록). 컨테이너의 `node` 사용자(uid 1000)와 호스트 `jarvis`(uid 1000)가 같아 권한 문제가 없다.
+- 프로토콜: 클라이언트→데몬 바이너리 프레임은 키 입력, 텍스트 프레임은 JSON 제어(`{"resize":[cols,rows]}`). 데몬→클라이언트 바이너리 프레임은 PTY 출력.
+- 데몬은 별도 패키지(`terminal-host/package.json`, node-pty는 네이티브 빌드 필요)라 Docker 빌드에 영향을 주지 않는다. 설치·실행:
+
+```bash
+cd terminal-host && npm install
+cp webobsidian-terminal.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now webobsidian-terminal
+```
+
+- 보안: 터미널은 단일 관리자 비밀번호 하나로 호스트 셸을 여는 기능이다. 비밀번호 강도와 로그인 시도 제한에 의존하므로 비밀번호를 짧게 두지 말 것.
+- 920px 이하 화면에서는 인스펙터와 함께 숨겨진다.
+- 개발 모드에서는 `vite.config.ts`의 `/api` 프록시에 `ws: true`가 설정되어 있다.
+
 ## 검증
 
 변경 후 최소한 다음 명령을 실행한다.
@@ -244,7 +270,7 @@ npm run lint
 npm run build
 ```
 
-마지막 확인 결과는 테스트 14개 파일, 총 119개 테스트 통과와 프로덕션 빌드 성공이다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
+마지막 확인 결과는 테스트 15개 파일, 총 119개 테스트 통과와 프로덕션 빌드 성공이다. 웹 터미널은 데몬·서버·클라이언트를 임시 소켓과 포트로 띄워 미인증 401, 로그인 후 PTY 출력, 작업 디렉터리, 리사이즈 반영을 실제 WebSocket 왕복으로 확인했다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 

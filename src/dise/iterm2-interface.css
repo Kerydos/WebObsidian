@@ -1,0 +1,389 @@
+/* ============================================================
+   DISE Vault — iTerm2 Classic Terminal Interface Theme
+   macOS iTerm2의 클래식 터미널(검정 배경 + 밝은 회색/터미널 그린)
+   색감을 Obsidian 인터페이스(UI 크롬)에 적용합니다.
+   본문(마크다운 렌더링 내용물)은 github-style.css / headings-github.css
+   가 계속 담당하며 이 파일은 건드리지 않습니다.
+   ============================================================ */
+
+.theme-dark {
+  /* ── 터미널 팔레트 (다크: iTerm2 클래식 검정+그린) ── */
+  --term-bg: #0c0c0c;            /* 터미널 검정 배경 */
+  --term-bg-elevated: #161616;   /* 살짝 밝은 패널 배경(사이드바/탭바) */
+  --term-bg-hover: #232323;      /* 호버 배경 */
+  --term-fg: #d4d4d4;            /* 밝은 회색 텍스트 */
+  --term-fg-dim: #8a8a8a;        /* 흐린 회색(비활성) */
+  --term-green: #29d398;         /* 터미널 그린(프롬프트/강조) */
+  --term-green-bright: #4dffb0;  /* 밝은 그린(호버/포커스) */
+  --term-border: #2a2a2a;        /* 구분선 */
+}
+
+.theme-light {
+  /* ── 터미널 팔레트 (라이트: iTerm2 Light Background 톤) ── */
+  --term-bg: #f5f5f4;            /* 터미널 라이트 배경 */
+  --term-bg-elevated: #ececea;   /* 살짝 어두운 패널 배경(사이드바/탭바) */
+  --term-bg-hover: #e0e0dd;      /* 호버 배경 */
+  --term-fg: #2c2c2c;            /* 짙은 회색 텍스트 */
+  --term-fg-dim: #767672;        /* 흐린 회색(비활성) */
+  --term-green: #0a7a3d;         /* 터미널 그린(라이트 배경 대비 확보용으로 짙게) */
+  --term-green-bright: #14914a;  /* 밝은 그린(호버/포커스) */
+  --term-border: #d7d7d3;        /* 구분선 */
+}
+
+.theme-dark,
+.theme-light {
+  /* ── 타이틀바 ── */
+  --titlebar-background: var(--term-bg-elevated);
+  --titlebar-background-focused: var(--term-bg-elevated);
+  --titlebar-text-color: var(--term-fg-dim);
+  --titlebar-text-color-focused: var(--term-fg);
+
+  /* ── 리본(왼쪽 아이콘 바) ── */
+  --ribbon-background: var(--term-bg);
+  --ribbon-background-collapsed: var(--term-bg);
+  --icon-color: var(--term-fg-dim);
+  --icon-color-hover: var(--term-green-bright);
+  --icon-color-active: var(--term-green);
+  --icon-color-focused: var(--term-green);
+
+  /* ── 탭 ── */
+  --tab-background-active: var(--term-bg-elevated);
+  --tab-container-background: var(--term-bg);
+  --tab-text-color: var(--term-fg-dim);
+  --tab-text-color-active: var(--term-fg);
+  --tab-text-color-focused: var(--term-fg-dim);
+  --tab-text-color-focused-active: var(--term-green);
+  --tab-text-color-focused-active-current: var(--term-green-bright);
+  --tab-divider-color: var(--term-border);
+  --tab-outline-color: var(--term-border);
+
+  /* ── 사이드바 / 네비게이션 ── */
+  --nav-item-color: var(--term-fg-dim);
+  --nav-item-color-hover: var(--term-fg);
+  --nav-item-color-active: var(--term-green);
+  --nav-item-background-hover: var(--term-bg-hover);
+  --nav-item-background-active: var(--term-bg-hover);
+  --nav-heading-color: var(--term-fg);
+  --nav-indentation-guide-color: var(--term-border);
+
+  /* ── 상태바 ── */
+  --status-bar-background: var(--term-bg-elevated);
+  --status-bar-border-color: var(--term-border);
+  --status-bar-text-color: var(--term-fg-dim);
+
+  /* ── 사이드바/워크스페이스 배경 ── */
+  --background-secondary: var(--term-bg-elevated);
+  --background-secondary-alt: var(--term-bg);
+
+  /* ── 구분선 ── */
+  --divider-color: var(--term-border);
+  --divider-color-hover: var(--term-fg-dim);
+
+  /* ── 스크롤바 ── */
+  --scrollbar-bg: var(--term-bg);
+  --scrollbar-thumb-bg: rgba(138, 138, 138, 0.3);
+  --scrollbar-active-thumb-bg: rgba(41, 211, 152, 0.4);
+
+  /* ── 프롬프트/모달 테두리 ── */
+  --prompt-border-color: var(--term-border);
+}
+
+/* ── 사이드바/리본/탭 영역 배경색 직접 지정 (테마별 하드코딩 대비) ── */
+.workspace-ribbon.mod-left,
+.workspace-ribbon.mod-right,
+.workspace-tab-header-container,
+.workspace-split.mod-left-split .workspace-tabs,
+.workspace-split.mod-right-split .workspace-tabs,
+.status-bar {
+  background-color: var(--term-bg-elevated) !important;
+  border-color: var(--term-border) !important;
+}
+
+.workspace-ribbon.mod-left,
+.workspace-ribbon.mod-right {
+  background-color: var(--term-bg) !important;
+}
+
+/* 루트(가운데) 탭바만 한 단계 더 어둡게.
+   활성 탭 배경(--tab-background-active = --term-bg-elevated)과 탭바 배경이
+   같은 색이면 탭 경계가 사라져 "탭이 안 보인다"로 느껴지므로 분리한다. */
+.workspace-split.mod-root .workspace-tab-header-container {
+  background-color: var(--term-bg) !important;
+}
+
+/* ── 창 최상단(타이틀바) 처리 ──
+   [중요] Obsidian 실제 구현(obsidian.asar/app.css) 확인 결과:
+
+     body.is-frameless.is-hidden-frameless .titlebar {
+       position: fixed; top:0; left:0; right:0;
+       height: calc(var(--header-height) - 1px);   → 39px
+       z-index: var(--layer-popover);
+     }
+     .is-hidden-frameless.mod-windows .titlebar,
+     .is-hidden-frameless.mod-linux   .titlebar {
+       background: transparent;      ← 반드시 투명이어야 함
+       pointer-events: none;
+     }
+
+   즉 Windows/Linux 기본 창 프레임(Obsidian 프레임) 모드에서 .titlebar 는
+   화면 최상단 전체 폭을 덮는 39px짜리 투명 오버레이이고, 그 아래에 실제
+   탭바(.workspace-tab-header-container)와 뷰 헤더 아이콘이 그려진다.
+
+   따라서 .titlebar 에 배경색을 주면(특히 !important) 탭·백링크/아웃라인
+   아이콘 등 상단 가운데 UI가 통째로 불투명한 막에 가려져 "배경색과 같아
+   보이지 않는" 증상이 된다. ← 이 스니펫의 실제 원인이었음.
+
+   ⇒ .titlebar 배경은 절대 칠하지 말 것. 창 조작 버튼 색만 지정한다. ── */
+.is-hidden-frameless.mod-windows .titlebar,
+.is-hidden-frameless.mod-linux .titlebar {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* 창 조작 버튼(최소화/최대화/닫기) — .titlebar 의 자식이라 색만 지정 */
+.titlebar-inner,
+.titlebar-button-container .titlebar-button {
+  color: var(--term-fg);
+}
+@media (hover: hover) {
+  .titlebar-button:hover {
+    background-color: var(--term-bg-hover);
+    color: var(--term-green-bright);
+  }
+  /* 닫기 버튼 hover 는 관례대로 빨강 유지 */
+  .titlebar-button.mod-close:hover {
+    background-color: #e5484d;
+    color: #ffffff;
+  }
+}
+
+/* ── 상단 탭바 / 뷰 헤더 아이콘 색 ──
+   탭 아이콘·백링크/아웃라인/더보기 버튼은 모두 --icon-color / --tab-text-*
+   변수를 따르므로 파일 상단에서 정의한 팔레트만으로 충분하다.
+   (stroke/fill 을 강제로 덮어쓰면 채움(fill) 방식으로 그려지는 아이콘이
+    오히려 사라지므로 건드리지 않는다.)
+   다만 --icon-opacity 로 흐려지는 것만 막아 대비를 확보한다. ── */
+.workspace-tab-header-inner-icon,
+.workspace-tab-header-inner-close-button,
+.workspace-tab-header-tab-list .clickable-icon,
+.workspace-tab-header-new-tab .clickable-icon,
+.view-header .clickable-icon,
+.view-actions .clickable-icon,
+.sidebar-toggle-button .clickable-icon {
+  opacity: 1;
+}
+
+/* 뷰 헤더 배경도 탭바와 통일 */
+.view-header {
+  background-color: var(--term-bg-elevated);
+  border-color: var(--term-border);
+}
+
+/* ── 좌우 사이드바: 글자 크기 확대 + 줄 간격 축소 ──
+   Obsidian 실제 구현(obsidian.asar 코드 확인):
+     .tree-item-self {
+       font-size: var(--nav-item-size);            → 기본 var(--font-ui-small) = 13px
+       line-height: var(--line-height-tight);      → 기본 1.3
+       padding: var(--nav-item-padding);           → 기본 4px 8px 4px 24px
+       margin-bottom: var(--nav-item-margin-bottom); → 기본 2px
+     }
+     .tree-item-self.mod-collapsible { padding: var(--nav-item-parent-padding); }
+       → 폴더 행은 별도 변수를 쓰므로 함께 조정하지 않으면 파일 행과 높이가 어긋남.
+
+   ※ 주의: calc(var(--x) + 4px) 처럼 변수가 자기 자신을 참조하면 CSS 사양상
+     순환 참조로 판정되어 값 전체가 무효 처리된다(적용 자체가 안 됨).
+     반드시 아래처럼 절대값으로 지정할 것.
+
+   결과: 파일명 13px → 18px, 행 높이 약 27px → 약 24px.
+   좌우 사이드바 컨테이너로만 스코프하여 본문·메뉴·모달에는 영향 없음. ── */
+.workspace-split.mod-left-split,
+.workspace-split.mod-right-split {
+  --font-ui-smaller: 16px;   /* 기본 12px — 검색 결과 개수 등 보조 텍스트 */
+  --font-ui-small: 17px;     /* 기본 13px — 사이드바 일반 UI 텍스트 */
+  --nav-item-size: 18px;     /* 기본 13px — 파일/폴더 이름 */
+
+  /* 상하 여백 4px → 1px (가로 여백 8px·24px은 아이콘/들여쓰기 정렬용이라 유지) */
+  --nav-item-padding: 1px var(--size-4-2) 1px var(--size-4-6);
+  --nav-item-parent-padding: 1px var(--size-4-2) 1px var(--size-4-6);
+  --nav-item-margin-bottom: 0px;  /* 기본 2px */
+}
+
+/* 행 높이의 대부분을 차지하는 line-height는 대응 변수가 없어 직접 지정 (기본 1.3).
+   font-size도 함께 명시해 다른 스니펫/테마 규칙에 밀리지 않도록 보장. */
+.workspace-split.mod-left-split .tree-item-self,
+.workspace-split.mod-right-split .tree-item-self {
+  font-size: var(--nav-item-size) !important;
+  line-height: 1.2 !important;
+}
+
+/* ── 파일 탐색기 폴더 아이콘 (GitHub 스타일) ──
+   GitHub 저장소 파일 목록에 쓰이는 공식 아이콘(primer/octicons의
+   file-directory-fill-16.svg)의 path를 그대로 사용.
+   background-image가 아니라 mask-image로 넣어 색상을 background-color로 제어.
+   색은 모드별로 다르게: 라이트는 짙은 그린(--term-green, #0a7a3d),
+   다크는 그레이(--term-fg-dim, #8a8a8a — 다른 사이드바 아이콘 및 폴더명
+   텍스트와 동일한 색이라 어두운 배경에서 튀지 않음).
+   크기를 1em으로 잡아 --nav-item-size(18px)를 바꾸면 아이콘도 같이 비례. ── */
+.nav-folder-title-content::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.4em;
+  vertical-align: -0.15em;
+  flex: 0 0 auto;
+  background-color: var(--term-green);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* 다크 모드에서는 그린 대신 그레이 (검정 배경에서 그린이 과하게 튀어 보임) */
+.theme-dark .nav-folder-title-content::before {
+  background-color: var(--term-fg-dim);
+}
+
+/* ── 선택된 파일이 들어 있는 폴더 강조 ──
+   활성 파일은 .nav-file-title.is-active 에 color: var(--nav-item-color-active)
+   (이 파일 설정상 터미널 그린)로 표시됨. 그 파일을 담고 있는 폴더에도 같은 변수를
+   써서 동일한 색으로 맞춤.
+   :has() 만 쓰면 조상 폴더가 전부 걸리므로, "하위 폴더가 그 파일을 품고 있는 경우"를
+   :not(:has(...)) 로 제외해 파일을 직접 담고 있는 가장 안쪽 폴더 하나만 선택.
+   폴더 아이콘은 currentColor 로 지정해 폴더 이름 색을 그대로 따라감. ── */
+.nav-folder:not(.mod-root):has(.nav-file-title.is-active):not(:has(.nav-folder .nav-file-title.is-active)) > .nav-folder-title {
+  color: var(--nav-item-color-active);
+}
+
+.nav-folder:not(.mod-root):has(.nav-file-title.is-active):not(:has(.nav-folder .nav-file-title.is-active)) > .nav-folder-title .nav-folder-title-content::before {
+  background-color: currentColor;
+}
+
+/* ── 하단 상태바를 본문 위에 띄우지 않고 별도 줄로 고정 ──
+   Obsidian 기본 상태바(백링크·속성·단어 수 등)는 position: fixed 로
+   창 우측 하단에 떠 있어 본문 글자를 덮는다.
+   .app-container 는 [.horizontal-main-container, .status-bar] 를 담는
+   세로 flex 컨테이너이므로, 상태바를 일반 흐름(static)으로 돌려놓으면
+   창 맨 아래에 한 줄을 차지하고 본문 영역은 그 위까지만 표시된다. ── */
+.app-container {
+  display: flex;
+  flex-direction: column;
+}
+.app-container > .horizontal-main-container {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.status-bar {
+  position: static !important;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  border-radius: 0 !important;
+  border-width: 1px 0 0 0 !important;
+  border-style: solid !important;
+}
+
+/* ── 상단 한 줄 통합: [탭들][▾][사이드바][← →][읽기모드][⋯][창 버튼] ──
+   Obsidian 기본 구조(obsidian.asar/app.css 확인):
+     .workspace-tabs            (flex column, position: relative)
+       ├ .workspace-tab-header-container   ← 탭 줄 (높이 --header-height)
+       └ .workspace-tab-container
+           └ .workspace-leaf (contain: strict — 자식이 밖으로 못 나감)
+               └ .workspace-leaf-content
+                   └ .view-header                ← 뒤/앞·제목·읽기모드·⋯ 줄
+   .view-header 는 contain: strict 안에 갇혀 있어 탭 줄로 끌어올릴 수 없으므로,
+   반대로 탭 줄을 absolute 로 띄워 .view-header 줄 위(왼쪽 부분)에 겹쳐 놓는다.
+   .view-header 는 제목을 숨기고 버튼을 오른쪽 끝으로 몰아, 탭 줄이 덮지 않는
+   오른쪽 폭(--dise-view-cluster)만 보이게 한다. 가운데(루트) 영역에만 적용. ── */
+.workspace-split.mod-root .workspace-tabs {
+  --dise-view-cluster: 140px;  /* 오른쪽 버튼 묶음 폭. 버튼이 잘리면 늘릴 것 */
+}
+.workspace-split.mod-root .workspace-tabs > .workspace-tab-header-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: var(--dise-view-cluster);
+  z-index: 2;
+}
+/* 창 오른쪽 위(최소화/최대화/닫기 버튼)와 맞닿은 탭 그룹 */
+.is-hidden-frameless:not(.is-fullscreen) .workspace-split.mod-root .workspace-tabs.mod-top-right-space > .workspace-tab-header-container {
+  right: calc(var(--dise-view-cluster) + var(--frame-right-space));
+  padding-right: var(--size-4-2);
+}
+/* 창 버튼 자리의 no-drag 가림막 — 탭 줄이 짧아지면 ▾/사이드바 버튼을 덮으므로 제거 */
+.is-hidden-frameless:not(.is-fullscreen) .workspace-split.mod-root .workspace-tabs.mod-top-right-space > .workspace-tab-header-container::after {
+  display: none;
+}
+
+.workspace-split.mod-root .view-header {
+  justify-content: flex-end;
+  padding-left: 0;
+  background-color: var(--term-bg);  /* 탭 줄(.mod-root 탭바)과 같은 색 */
+  border-bottom: var(--tab-outline-width) solid var(--tab-outline-color);
+}
+.workspace-split.mod-root .view-header-title-container {
+  display: none;
+}
+.is-hidden-frameless:not(.is-fullscreen) .workspace-split.mod-root .workspace-tabs.mod-top-right-space .view-header {
+  padding-right: calc(var(--size-4-3) + var(--frame-right-space));
+}
+
+/* Google Calendar: keep sidebar typography independent from enlarged navigation text. */
+.gcal {
+  --font-ui-smaller: 12px;
+  --font-ui-small: 13px;
+  --font-ui-medium: 15px;
+  --fc-small-font-size: 12px;
+  font-family: var(--font-interface);
+  font-size: 13px;
+  line-height: 1.4;
+  container-type: inline-size;
+}
+.gcal .fc .fc-toolbar-chunk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.gcal .fc .fc-toolbar-chunk > * { margin: 0; }
+.gcal .fc .fc-toolbar-title { line-height: 1.4; }
+.gcal .fc .fc-daygrid-dot-event {
+  overflow: hidden;
+  max-width: 100%;
+}
+.gcal .fc .fc-daygrid-event .fc-event-time {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gcal .fc .fc-daygrid-dot-event .fc-event-title {
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+@container (max-width: 480px) {
+  .gcal .fc .fc-daygrid-dot-event {
+    display: block;
+    padding: 2px 3px;
+    border-left: 3px solid var(--fc-event-border-color);
+  }
+  .gcal .fc .fc-daygrid-event-dot { display: none; }
+  .gcal .fc .fc-daygrid-dot-event .fc-event-time {
+    display: block;
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .gcal .fc .fc-daygrid-dot-event .fc-event-title {
+    display: block;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

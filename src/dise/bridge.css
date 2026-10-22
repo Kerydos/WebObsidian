@@ -1,0 +1,93 @@
+/* DISE enabled snippets, in the vault’s configured order; originals are unchanged. */
+@import "./github-style.css";
+@import "./headings-github.css";
+@import "./iterm2-interface.css";
+@import "./code-font-korean.css";
+@import "./agent-client-font.css";
+@import "./folder-purpose-icons.css";
+@import "./agent-client-activity.css";
+
+@font-face { font-family: 'KoPubWorld돋움체'; src: url('./kopub-medium.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'KoPubWorld돋움체'; src: url('./kopub-bold.ttf') format('truetype'); font-weight: 600 900; font-display: swap; }
+
+/* Bridge Obsidian variables to WebObsidian without changing layout or editor behavior. */
+.app-shell[data-theme] {
+  --font-ui: 'A2Z 5', 'KoPubWorld돋움체', sans-serif;
+  --font-interface: var(--font-ui);
+  --font-text: var(--font-markdown);
+  --font-text-size: var(--markdown-font-size);
+  --font-ui-small: 14px;
+  --font-ui-smaller: 12px;
+  --line-height-normal: 1.5;
+  --ink: var(--term-fg);
+  --muted: var(--term-fg-dim);
+  --line: var(--term-border);
+  --panel: var(--term-bg-elevated);
+  --inspector: var(--term-bg-elevated);
+  --surface-raised: var(--term-bg-elevated);
+  --surface-input: var(--term-bg);
+  --surface-hover: var(--term-bg-hover);
+  --paper: #fff;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+.app-shell.theme-dark {
+  --paper: #0d1117;
+  --dise-h1: hsl(218, 92%, 79%);
+  --dise-h2: hsl(218, 72%, 75%);
+  --dise-h3: hsl(218, 55%, 72%);
+  --dise-h4: hsl(218, 40%, 69%);
+  --dise-h5: hsl(218, 28%, 66%);
+}
+.app-shell :is(.topbar, .sidebar, .inspector, .assistant-meta, .assistant-composer) {
+  background: var(--term-bg-elevated);
+  color: var(--term-fg);
+  border-color: var(--term-border);
+}
+.app-shell :is(.topbar-button, .logout-button, .vault-pill, .save-status) { color: var(--term-fg-dim); border-color: var(--term-border); }
+.app-shell :is(.topbar-button, .logout-button, .vault-pill):hover { background: var(--term-bg-hover); color: var(--term-green-bright); }
+.app-shell :is(.note-item.active, .folder-item.selected, .toc-list button.active) { background: var(--term-bg-hover); color: var(--term-green); }
+.app-shell .primary-action { background: var(--term-green); color: var(--term-bg); border-color: var(--term-green); }
+.app-shell .brand-mark { background: var(--term-green); color: var(--term-bg); }
+.workspace[data-type='markdown'] {
+  --markdown-text: var(--text-normal);
+  --markdown-heading: var(--text-normal);
+  --markdown-muted: var(--text-muted);
+  --markdown-link: var(--link-color);
+  --markdown-link-hover: var(--link-color-hover);
+  --markdown-code-bg: var(--code-background);
+  --markdown-code-text: var(--code-normal);
+  --markdown-code-block-bg: var(--code-background);
+  --markdown-code-block-text: var(--code-normal);
+  --markdown-quote-bg: var(--background-primary-alt);
+  --line: var(--background-modifier-border);
+  background: var(--background-primary);
+}
+.workspace .cm-scroller { line-height: 1.5; }
+.workspace .cm-line.HyperMD-header { line-height: 1.25 !important; letter-spacing: normal; }
+.workspace .cm-live-strong { font-weight: 600; }
+.workspace :is(.cm-live-link, .cm-live-table-link) { color: var(--link-external-color) !important; text-decoration: none; }
+.workspace .cm-live-wiki-link { color: var(--link-color); background: transparent; border: 0; padding: 0; font-weight: inherit; }
+.workspace :is(.cm-live-link, .cm-live-wiki-link, .cm-live-table-link):hover { color: var(--link-color-hover) !important; background: transparent; }
+.workspace .cm-live-inline-code {
+  background: var(--code-background); color: var(--code-normal); border: 0; border-radius: 6px;
+  padding: .2em .4em; font-family: var(--font-monospace); font-size: var(--code-size);
+  font-variant-ligatures: none; letter-spacing: 0;
+}
+.workspace .cm-live-code-block { background: var(--code-background); color: var(--code-normal); border: 0; border-radius: 6px; padding: 0; }
+.workspace .cm-live-code-block pre { padding: 16px; line-height: 1.45; }
+.workspace .cm-line.cm-live-quote { border-left: .25em solid var(--interactive-accent); padding: .6em 1em; background: var(--background-primary-alt); color: var(--text-muted); font-style: normal; border-radius: 0 6px 6px 0; }
+.workspace .cm-live-table-wrap { border: 0; border-radius: 0; }
+.workspace .cm-live-table-wrap table { font-size: var(--markdown-font-size); }
+.workspace .cm-live-table-wrap th { color: var(--text-normal); }
+.workspace .cm-live-rule { height: .25em; margin: 24px 0; background: var(--background-modifier-border); }
+.workspace .cm-live-checkbox { border-radius: 3px; accent-color: var(--interactive-accent); }
+.workspace .cm-line:has(.cm-live-checkbox:checked) { color: var(--text-faint); opacity: .6; }
+.workspace .cm-selectionBackground, .workspace .cm-focused .cm-selectionBackground { background: var(--text-selection) !important; }
+.theme-dark .workspace .cm-live-highlight { background: #bb800966; color: #e6edf3; }
+.theme-dark .workspace .cm-line.cm-live-callout { background: var(--background-primary-alt); color: var(--text-normal); }
+.app-shell :is(.assistant-bubble, .assistant-composer textarea) { font-family: var(--font-text); font-size: var(--font-text-size); line-height: 1.5; }
+/* The web assistant has no Agent Client tool/permission rows; those original rules stay dormant. */
+.nav-folder-title-content { display: inline-flex; align-items: center; gap: 6px; }
+.nav-folder-title-content::before { content: ''; display: inline-block; width: 14px; height: 14px; flex-shrink: 0; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M3 5h7l2 3h9v12H3z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.folder-item > .lucide-folder { display: none; }

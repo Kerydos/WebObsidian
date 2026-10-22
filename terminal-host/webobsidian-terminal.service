@@ -1,0 +1,14 @@
+[Unit]
+Description=WebObsidian web terminal host (PTY over unix socket)
+
+[Service]
+Type=simple
+WorkingDirectory=/home/jarvis/Workspace/WebObsidian/terminal-host
+ExecStart=/usr/bin/node server.mjs
+Environment=PATH=/home/jarvis/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LANG=C.UTF-8
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

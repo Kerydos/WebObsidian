@@ -27,7 +27,7 @@ WEBOBSIDIAN_PASSWORD='12자 이상의 비밀번호' npm run server:dev
 npm run dev
 ```
 
-기본 서버 볼트는 프로젝트의 `vault/` 폴더이며 `WEBOBSIDIAN_VAULT_DIR` 환경 변수로 변경할 수 있습니다.
+기본 서버 볼트는 `~/Documents/SecondBrain` 폴더이며 `WEBOBSIDIAN_VAULT_DIR` 환경 변수로 변경할 수 있습니다.
 
 검증 명령은 다음과 같습니다.
 
@@ -54,10 +54,10 @@ HOST=127.0.0.1 PORT=3000 npm start
 
 서버 프로세스가 해당 볼트 폴더를 읽고 쓸 수 있어야 합니다. Nginx 또는 Caddy에서 `127.0.0.1:3000`으로 리버스 프록시하고 HTTPS를 적용하세요.
 
-Docker Compose를 사용하면 저장 파일은 호스트의 `./vault` 폴더에 남습니다.
+Docker Compose를 사용하면 저장 파일은 호스트의 `~/Documents/SecondBrain` 폴더(`WEBOBSIDIAN_VAULT_HOST_DIR`로 변경 가능)에 남습니다.
 
 ```bash
-mkdir -p vault
+mkdir -p ~/Documents/SecondBrain
 cp .env.example .env
 chmod 600 .env
 # .env의 WEBOBSIDIAN_PASSWORD를 12자 이상의 운영 비밀번호로 변경하세요.
@@ -75,7 +75,7 @@ docker compose up -d --build
 | `WEBOBSIDIAN_PASSWORD` | 없음, 필수 | 12자 이상의 관리자 비밀번호 |
 | `WEBOBSIDIAN_MIN_PASSWORD_LENGTH` | `12` | 비밀번호 최소 길이. 개인 테스트 환경에서만 완화 |
 | `WEBOBSIDIAN_SECURE_COOKIE` | 운영 모드에서 `true` | HTTPS 전용 세션 쿠키 사용 여부 |
-| `WEBOBSIDIAN_VAULT_DIR` | 프로젝트의 `vault/` | Markdown 파일 저장 폴더 |
+| `WEBOBSIDIAN_VAULT_DIR` | `~/Documents/SecondBrain` | Markdown 파일 저장 폴더 |
 | `WEBOBSIDIAN_DIST_DIR` | 프로젝트의 `dist/` | 빌드된 정적 파일 폴더 |
 | `HOST` | `127.0.0.1` | 서버 바인딩 주소 |
 | `PORT` | `3000` | 서버 포트 |

@@ -1,0 +1,230 @@
+/* ============================================================
+   DISE Vault — Heading Styles (Body size + step)
+   본문 baseFontSize 대비 h6→h1로 갈수록 +1px씩 커지는
+   선형(additive) 스케일. calc()를 사용해 본문 크기 변경 시에도
+   비율이 유지됩니다.
+   색상은 GitHub 기본(본문과 동일 색상, h6만 muted)을 따릅니다.
+
+   ★ 중요 제약 ★
+   편집 모드(Live Preview)의 헤더는 .cm-line 요소 자체에 클래스가 붙는다.
+   CodeMirror 6는 줄(.cm-line)의 높이를 offsetHeight 로 측정하는데
+   offsetHeight 에는 margin 이 포함되지 않는다. 따라서 .cm-line 에 margin 을
+   주면 CM6 내부 높이맵과 실제 화면 위치가 어긋나, 클릭하거나 방향키로
+   이동할 때 커서가 엉뚱한 줄(주로 위쪽 줄)로 튀는 버그가 생긴다.
+   → 편집 모드 줄 간격은 반드시 padding 으로만 준다. margin 금지.
+   읽기 모드(.markdown-rendered)는 일반 HTML 이므로 margin 을 그대로 쓴다.
+   ============================================================ */
+
+/* ── 읽기 모드 공통 ── */
+.markdown-rendered h1,
+.markdown-rendered h2,
+.markdown-rendered h3,
+.markdown-rendered h4,
+.markdown-rendered h5,
+.markdown-rendered h6 {
+  color: var(--text-normal) !important;
+  font-style: normal !important;
+  line-height: 1.25;
+  margin-bottom: 0.75rem !important;
+}
+
+/* ── 편집 모드 공통: margin 대신 padding ── */
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header {
+  color: var(--text-normal) !important;
+  font-style: normal !important;
+  line-height: 1.25;
+  margin: 0 !important;
+  padding-bottom: 0.75rem;
+}
+
+/* ── h1 : 본문 +6px | GitHub 스타일 하단 구분선 ── */
+.markdown-rendered h1 {
+  font-size: calc(1em + 6px);
+  font-weight: 600;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-top: 1.2em;
+}
+.markdown-source-view.mod-cm6 .cm-header-1 {
+  font-size: calc(1em + 6px);
+  font-weight: 600;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-1 {
+  font-size: calc(1em + 6px);
+  font-weight: 600;
+  padding-top: 1.2em;
+  padding-bottom: calc(0.3em + 0.75rem);
+  /* border-bottom 대신 배경 그라디언트로 구분선을 그린다.
+     border 는 padding 바깥에 그려져 0.75rem 만큼 아래로 밀리므로,
+     background-position 으로 텍스트 0.3em 아래에 정확히 붙인다. */
+  background-image: linear-gradient(
+    var(--background-modifier-border),
+    var(--background-modifier-border)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: 0 calc(100% - 0.75rem);
+}
+
+/* ── h2 : 본문 +5px | GitHub 스타일 하단 구분선 ── */
+.markdown-rendered h2 {
+  font-size: calc(1em + 5px);
+  font-weight: 600;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-top: 1em;
+}
+.markdown-source-view.mod-cm6 .cm-header-2 {
+  font-size: calc(1em + 5px);
+  font-weight: 600;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-2 {
+  font-size: calc(1em + 5px);
+  font-weight: 600;
+  padding-top: 1em;
+  padding-bottom: calc(0.25em + 0.75rem);
+  background-image: linear-gradient(
+    var(--background-modifier-border),
+    var(--background-modifier-border)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: 0 calc(100% - 0.75rem);
+}
+
+/* ── h3 : 본문 +4px ── */
+.markdown-rendered h3 {
+  font-size: calc(1em + 4px);
+  font-weight: 600;
+  margin-top: 0.9em;
+}
+.markdown-source-view.mod-cm6 .cm-header-3 {
+  font-size: calc(1em + 4px);
+  font-weight: 600;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-3 {
+  font-size: calc(1em + 4px);
+  font-weight: 600;
+  padding-top: 0.9em;
+}
+
+/* ── h4 : 본문 +3px ── */
+.markdown-rendered h4 {
+  font-size: calc(1em + 3px);
+  font-weight: 600;
+  margin-top: 0.8em;
+}
+.markdown-source-view.mod-cm6 .cm-header-4 {
+  font-size: calc(1em + 3px);
+  font-weight: 600;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-4 {
+  font-size: calc(1em + 3px);
+  font-weight: 600;
+  padding-top: 0.8em;
+}
+
+/* ── h5 : 본문 +2px ── */
+.markdown-rendered h5 {
+  font-size: calc(1em + 2px);
+  font-weight: 600;
+  margin-top: 0.7em;
+}
+.markdown-source-view.mod-cm6 .cm-header-5 {
+  font-size: calc(1em + 2px);
+  font-weight: 600;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-5 {
+  font-size: calc(1em + 2px);
+  font-weight: 600;
+  padding-top: 0.7em;
+}
+
+/* ── h6 : 본문 +1px | GitHub 스타일 옅은 회색 텍스트 ── */
+.markdown-rendered h6 {
+  font-size: calc(1em + 1px);
+  font-weight: 600;
+  color: var(--text-muted) !important;
+  margin-top: 0.6em;
+}
+.markdown-source-view.mod-cm6 .cm-header-6 {
+  font-size: calc(1em + 1px);
+  font-weight: 600;
+  color: var(--text-muted) !important;
+}
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-6 {
+  font-size: calc(1em + 1px);
+  font-weight: 600;
+  color: var(--text-muted) !important;
+  padding-top: 0.6em;
+}
+
+/* ── 텍스트 밑줄(underline) 완전 제거 ── */
+.markdown-source-view .cm-header,
+.markdown-source-view .HyperMD-header,
+.markdown-rendered h3,
+.markdown-rendered h4,
+.markdown-rendered h5,
+.markdown-rendered h6 {
+  text-decoration: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+.markdown-rendered h1,
+.markdown-rendered h2 {
+  text-decoration: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   헤더 색상 — 같은 파랑 계열, 채도·명도 단계로 h1→h5 구분
+   (h6 은 GitHub 스타일대로 muted 회색 유지)
+   accentColor(#5a6ba0)와 같은 계열의 hue 220 을 사용한다.
+   h1 이 가장 진하고 채도가 높으며, h5 로 갈수록 옅어진다.
+   ============================================================ */
+body {
+  --dise-h1: hsl(220, 68%, 30%);
+  --dise-h2: hsl(220, 55%, 38%);
+  --dise-h3: hsl(220, 44%, 45%);
+  --dise-h4: hsl(220, 34%, 49%);
+  --dise-h5: hsl(220, 28%, 52%);
+}
+.theme-dark body,
+body.theme-dark {
+  --dise-h1: hsl(218, 92%, 79%);
+  --dise-h2: hsl(218, 72%, 75%);
+  --dise-h3: hsl(218, 55%, 72%);
+  --dise-h4: hsl(218, 40%, 69%);
+  --dise-h5: hsl(218, 28%, 66%);
+}
+
+/* 읽기 모드 */
+.markdown-rendered h1 { color: var(--dise-h1) !important; }
+.markdown-rendered h2 { color: var(--dise-h2) !important; }
+.markdown-rendered h3 { color: var(--dise-h3) !important; }
+.markdown-rendered h4 { color: var(--dise-h4) !important; }
+.markdown-rendered h5 { color: var(--dise-h5) !important; }
+
+/* 편집 모드(Live Preview) — 줄 전체와 헤더 텍스트 span 양쪽에 적용 */
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-1,
+.markdown-source-view.mod-cm6 .cm-header-1 { color: var(--dise-h1) !important; }
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-2,
+.markdown-source-view.mod-cm6 .cm-header-2 { color: var(--dise-h2) !important; }
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-3,
+.markdown-source-view.mod-cm6 .cm-header-3 { color: var(--dise-h3) !important; }
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-4,
+.markdown-source-view.mod-cm6 .cm-header-4 { color: var(--dise-h4) !important; }
+.markdown-source-view.mod-cm6 .cm-line.HyperMD-header-5,
+.markdown-source-view.mod-cm6 .cm-header-5 { color: var(--dise-h5) !important; }
+
+/* 헤더 앞의 # 기호는 눈에 덜 띄게 */
+.markdown-source-view.mod-cm6 .cm-formatting-header {
+  opacity: 0.45;
+}
+
+/* 아웃라인·목차 패널에서도 같은 단계 색을 쓴다 */
+.outline-view .tree-item-self[data-heading-level="1"] .tree-item-inner { color: var(--dise-h1); }
+.outline-view .tree-item-self[data-heading-level="2"] .tree-item-inner { color: var(--dise-h2); }
+.outline-view .tree-item-self[data-heading-level="3"] .tree-item-inner { color: var(--dise-h3); }
+.outline-view .tree-item-self[data-heading-level="4"] .tree-item-inner { color: var(--dise-h4); }
+.outline-view .tree-item-self[data-heading-level="5"] .tree-item-inner { color: var(--dise-h5); }

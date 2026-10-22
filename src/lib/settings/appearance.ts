@@ -19,14 +19,14 @@ export interface AppearanceSettings {
 export const APPEARANCE_STORAGE_KEY = 'webobsidian:appearance:v1';
 
 export const defaultAppearance: AppearanceSettings = {
-  theme: 'paper',
+  theme: 'light',
   bodyFont: 'sans',
   headingFont: 'sans',
   codeFont: 'system',
   documentStyle: 'comfortable',
-  fontSize: 16,
-  lineHeight: 1.8,
-  accent: '#bf5f3b',
+  fontSize: 18,
+  lineHeight: 1.5,
+  accent: '#0a7a3d',
 };
 
 const themes = new Set<ColorTheme>(['paper', 'light', 'dark']);
@@ -61,13 +61,13 @@ export function parseAppearance(value: string | null): AppearanceSettings {
 }
 
 const fontStacks: Record<FontChoice, string> = {
-  sans: "Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  sans: "'KoPubWorld돋움체', Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   serif: "'Noto Serif KR', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif",
   mono: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
 };
 
 const codeFontStacks: Record<CodeFontChoice, string> = {
-  system: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
+  system: "D2Coding, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
   classic: "'Courier New', Courier, monospace",
 };
 
@@ -84,8 +84,7 @@ export function appearanceVariables(settings: AppearanceSettings): AppearanceVar
     '--font-markdown': fontStacks[settings.bodyFont],
     '--font-heading': fontStacks[settings.headingFont],
     '--font-code': codeFontStacks[settings.codeFont],
-    // Rendered 1px smaller than the stored/displayed setting; the raw size reads too large in the editor.
-    '--markdown-font-size': `${settings.fontSize - 1}px`,
+    '--markdown-font-size': `${settings.fontSize}px`,
     '--markdown-line-height': settings.lineHeight,
     '--editor-width': styleWidths[settings.documentStyle],
     '--accent': settings.accent,

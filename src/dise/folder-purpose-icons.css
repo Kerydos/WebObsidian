@@ -1,0 +1,67 @@
+/* Folder purpose indicators only; these do not restrict access or deletion. */
+body .nav-folder-title[data-path="00. Inbox"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="00. Inbox/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%204h16l2%2010v6H2v-6L4%204Z%22%2F%3E%3Cpath%20d%3D%22M2%2014h6l2%203h4l2-3h6%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%204h16l2%2010v6H2v-6L4%204Z%22%2F%3E%3Cpath%20d%3D%22M2%2014h6l2%203h4l2-3h6%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="10. Projects"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="10. Projects/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M8%207V3h8v4M3%2012c5%204%2013%204%2018%200M10%2013h4%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%227%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M8%207V3h8v4M3%2012c5%204%2013%204%2018%200M10%2013h4%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="20. Areas"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="20. Areas/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%229%22%2F%3E%3Cpath%20d%3D%22m16%208-3%205-5%203%203-5%205-3Z%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%229%22%2F%3E%3Cpath%20d%3D%22m16%208-3%205-5%203%203-5%205-3Z%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="30. Resources"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="30. Resources/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%204h7l2%202%202-2h7v16h-7l-2%202-2-2H3V4ZM12%206v16%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%204h7l2%202%202-2h7v16h-7l-2%202-2-2H3V4ZM12%206v16%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="80. Wiki"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="80. Wiki/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%203h5v18H4zM11%203h4v18h-4zM17%204l4-1%203%2017-4%201z%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%203h5v18H4zM11%203h4v18h-4zM17%204l4-1%203%2017-4%201z%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="Meetings"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="Meetings/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M21%204H3v13h4v4l5-4h9V4Z%22%2F%3E%3Cpath%20d%3D%22M7%208h10M7%2012h7%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M21%204H3v13h4v4l5-4h9V4Z%22%2F%3E%3Cpath%20d%3D%22M7%208h10M7%2012h7%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="Attachs"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="Attachs/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m8%2012%207-7a4%204%200%200%201%206%206L10%2022a6%206%200%200%201-8-8L13%203M5%2017l10-10a1.5%201.5%200%200%201%202%202L7%2019%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m8%2012%207-7a4%204%200%200%201%206%206L10%2022a6%206%200%200%201-8-8L13%203M5%2017l10-10a1.5%201.5%200%200%201%202%202L7%2019%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="Excalidraw"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="Excalidraw/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m4%2016-1%205%205-1L21%207l-4-4L4%2016ZM14%206l4%204M4%2016l4%204%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m4%2016-1%205%205-1L21%207l-4-4L4%2016ZM14%206l4%204M4%2016l4%204%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="80. Wiki/Lint"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="80. Wiki/Lint/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%204H4v18h16V4h-4M8%202h8v5H8zM7%2013l3%203%207-7%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%204H4v18h16V4h-4M8%202h8v5H8zM7%2013l3%203%207-7%22%2F%3E%3C%2Fsvg%3E");
+}
+
+body .nav-folder-title[data-path="99. Ignored"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^="99. Ignored/"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path=".obsidian"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^=".obsidian/"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path=".git"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^=".git/"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path=".claude"] > .nav-folder-title-content::before,
+body .nav-folder-title[data-path^=".claude/"] > .nav-folder-title-content::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%228%22%20cy%3D%228%22%20r%3D%225%22%2F%3E%3Cpath%20d%3D%22m12%2012%209%209M16%2016l3-3M19%2019l3-3%22%2F%3E%3C%2Fsvg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%228%22%20cy%3D%228%22%20r%3D%225%22%2F%3E%3Cpath%20d%3D%22m12%2012%209%209M16%2016l3-3M19%2019l3-3%22%2F%3E%3C%2Fsvg%3E");
+}
+

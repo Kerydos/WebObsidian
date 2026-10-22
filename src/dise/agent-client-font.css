@@ -1,0 +1,61 @@
+/* Follow Obsidian typography without modifying the plugin's files. */
+body .agent-client-chat-view-container {
+  --ac-chat-font-size: var(--font-text-size) !important;
+  --ac-chat-detail-font-size: var(--font-ui-small) !important;
+}
+
+body :is(.agent-client-chat-view-container, .agent-client-floating-window,
+  .agent-client-embedded-chat-panel, .agent-client-session-history-list,
+  .agent-client-permission-dialog, .agent-client-mention-dropdown) {
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+}
+
+body :is(.agent-client-markdown-text-renderer, .agent-client-text-with-mentions,
+  .agent-client-chat-input-textarea, .agent-client-hint-overlay) {
+  font-family: var(--font-text) !important;
+  font-size: var(--font-text-size) !important;
+  line-height: var(--line-height-normal);
+}
+
+body .agent-client-collapsible-thought-content {
+  font-family: var(--font-text);
+}
+
+body :is(.agent-client-chat-view-header, .agent-client-inline-header,
+  .agent-client-chat-input-actions, .agent-client-collapsible-thought-header,
+  .agent-client-message-tool-call-title, .agent-client-mention-dropdown,
+  .agent-client-permission-option, .agent-client-agent-label,
+  .agent-client-toolbar-dropdown-label-area > *,
+  .agent-client-agent-selector select.dropdown,
+  .agent-client-chat-view-container button,
+  .agent-client-session-history-item-title,
+  .agent-client-session-history-filter-label) {
+  font-family: var(--font-interface) !important;
+  font-size: var(--font-ui-small) !important;
+}
+
+body :is(.agent-client-usage-indicator, .agent-client-chat-view-header-update,
+  .agent-client-mention-dropdown-item-path,
+  .agent-client-attachment-preview-file-name,
+  .agent-client-message-resource-link-name,
+  .agent-client-session-history-item-timestamp,
+  .agent-client-session-history-item-cwd) {
+  font-family: var(--font-interface) !important;
+  font-size: var(--font-ui-smaller) !important;
+}
+
+/* Let larger interface text fit the controls. */
+body .agent-client-toolbar-dropdown {
+  height: auto;
+  min-height: 24px;
+}
+
+/* Keep code aligned with the vault's existing code font and size. */
+body :is(.agent-client-terminal-renderer, .agent-client-tool-call-diff,
+  .agent-client-message-tool-call-command code,
+  .agent-client-markdown-text-renderer code,
+  .agent-client-markdown-text-renderer pre) {
+  font-family: var(--font-monospace) !important;
+  font-size: var(--code-size) !important;
+}

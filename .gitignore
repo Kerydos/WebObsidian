@@ -1,6 +1,7 @@
 node_modules/
+terminal-host/node_modules/
 dist/
-/vault/
+/vault
 .env
 !.env.example
 .vite/

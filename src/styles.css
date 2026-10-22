@@ -191,6 +191,16 @@ button { color: inherit; }
 .center-state p { margin: 0; }
 
 .inspector { grid-area: inspect; overflow: auto; background: var(--inspector); border-left: 1px solid var(--line); }
+/* 웹 터미널이 열리면 오른쪽 열을 넓혀 80열 이상을 확보한다. */
+.app-shell[data-terminal='true'] { grid-template-columns: var(--sidebar-width, 252px) minmax(420px, 1fr) min(640px, 45vw); }
+.terminal-panel { display: flex; flex-direction: column; overflow: hidden; background: #14120f; color: #e8e2d8; }
+.terminal-panel .inspector-heading { min-height: 0; padding: 10px 14px; border-color: #2a2622; }
+.terminal-panel .inspector-heading strong { font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.terminal-actions { display: flex; gap: 6px; }
+.terminal-host { flex: 1; min-height: 0; padding: 6px 0 6px 8px; }
+.terminal-host .xterm { height: 100%; }
+.terminal-notice { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px 14px; border-top: 1px solid #2a2622; color: #b8b0a4; font-size: 12px; line-height: 1.5; }
+.terminal-notice code { color: #d7ad4a; }
 .inspector-heading { min-height: 75px; display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .inspector-heading div { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .inspector-heading span { color: var(--muted); font-size: 10px; }

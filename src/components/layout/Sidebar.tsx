@@ -120,11 +120,12 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
                   <div key={`folder:${row.path}`} className="folder-row">
                     <div
                       className={[
-                        'folder-item',
+                        'folder-item nav-folder-title',
                         selectedFolder === row.path ? 'selected' : '',
                         dragOverTarget === row.path ? 'drop-target' : '',
                       ].filter(Boolean).join(' ')}
                       style={{ paddingLeft: 9 + row.depth * 14 }}
+                      data-path={row.path}
                       role={isRenaming ? undefined : 'button'}
                       tabIndex={isRenaming ? undefined : 0}
                       aria-expanded={isRenaming ? undefined : !isCollapsed}
@@ -165,7 +166,7 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
                           onBlur={handleRenameBlur}
                         />
                       ) : (
-                        <span onDoubleClick={() => startRenameFolder(row.path)}>{row.name}</span>
+                        <span className="nav-folder-title-content" onDoubleClick={() => startRenameFolder(row.path)}>{row.name}</span>
                       )}
                     </div>
                     {!isRenaming ? (

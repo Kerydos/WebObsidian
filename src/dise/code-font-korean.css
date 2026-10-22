@@ -1,0 +1,104 @@
+/* ───────────────────────────────────────────────────────────────
+   code-font-korean.css
+   코드 블록에서만 한글 고정폭 폰트(D2Coding)를 쓰고,
+   박스 다이어그램이 줄바꿈으로 깨지지 않게 만듭니다.
+
+   해결하는 문제 3가지
+     1. 한글 폭이 영문의 2배가 아니라 테두리가 어긋남
+        → D2Coding (한글 = 영문 × 2 정확히)
+     2. 코드 글자가 본문 크기(18px)를 따라가 폭을 넘침
+        → --code-size 로 코드만 작게
+     3. 폭을 넘으면 줄바꿈되어 표가 깨짐
+        → 줄바꿈 금지 + 가로 스크롤 (읽기 뷰 · 편집 뷰 모두)
+
+   해결 못 하는 것
+     이모지(🔒 ✅ 📌)는 어떤 고정폭 폰트로도 정렬되지 않습니다.
+     박스 그림 안에서는 ✓ · * - 를 쓰세요.
+
+   폰트: D2Coding (NAVER) — SIL Open Font License 1.1
+   적용: 설정 → 모양 → CSS 스니펫 에서 'code-font-korean' 켜기
+   ─────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: 'D2Coding';
+  src: url('d2coding.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'D2Coding';
+  src: url('d2coding-bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+body {
+  --font-monospace:       'D2Coding', 'Nanum Gothic Coding', 'Sarasa Mono K',
+                          Consolas, 'Courier New', monospace;
+  --font-monospace-theme: var(--font-monospace);
+
+  /* ▼ 코드 글자 크기. 박스가 잘리면 13px, 12px 로 더 줄이세요 ▼ */
+  --code-size: 14px;
+}
+
+/* ── 1. 폰트 적용 ───────────────────────────────────────────── */
+.markdown-rendered code,
+.markdown-rendered pre,
+.markdown-rendered pre code,
+.markdown-preview-view code,
+.markdown-preview-view pre,
+.cm-s-obsidian .cm-inline-code,
+.cm-s-obsidian .HyperMD-codeblock,
+.cm-s-obsidian .cm-hmd-codeblock,
+.cm-s-obsidian .cm-formatting-code-block {
+  font-family: var(--font-monospace) !important;
+  font-size: var(--code-size) !important;
+  font-variant-ligatures: none;
+  font-feature-settings: normal;
+  font-kerning: none;
+  letter-spacing: 0;
+  font-variant-numeric: normal;
+  tab-size: 4;
+}
+
+/* ── 2. 읽기 뷰 : 줄바꿈 금지 + 가로 스크롤 ─────────────────── */
+.markdown-rendered pre,
+.markdown-preview-view pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.35;
+}
+.markdown-rendered pre > code,
+.markdown-preview-view pre > code {
+  white-space: pre !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+/* ── 3. 편집 뷰(라이브 프리뷰) : 줄바꿈 금지 + 가로 스크롤 ──── */
+/* CodeMirror는 기본이 pre-wrap 이라 코드블록 줄만 따로 풉니다   */
+.markdown-source-view.mod-cm6 .cm-content > .HyperMD-codeblock,
+.cm-s-obsidian .HyperMD-codeblock {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.35;
+}
+
+/* 줄마다 스크롤바가 생기지 않도록 가늘게 · 필요할 때만 */
+.cm-s-obsidian .HyperMD-codeblock::-webkit-scrollbar { height: 0; }
+.cm-s-obsidian .HyperMD-codeblock:hover::-webkit-scrollbar { height: 6px; }
+
+/* ── 4. 코드 블록이 본문 폭 제한에 갇히지 않게 ──────────────── */
+.markdown-rendered pre,
+.markdown-preview-view pre {
+  max-width: none;
+}
+
+/* ── 5. 굵기 변화로 폭이 틀어지는 것 방지 ───────────────────── */
+.markdown-rendered pre code strong,
+.markdown-rendered pre code b,
+.cm-s-obsidian .HyperMD-codeblock .cm-strong {
+  font-weight: 400;
+}

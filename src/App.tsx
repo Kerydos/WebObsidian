@@ -21,6 +21,7 @@ import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/setti
 import { emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
+const TerminalPanel = lazy(() => import('./components/TerminalPanel'));
 const SIDEBAR_WIDTH_STORAGE_KEY = 'webobsidian:sidebarwidth:v1';
 const SIDEBAR_WIDTH_RANGE = { min: 180, max: 560, default: 252 };
 
@@ -68,6 +69,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { appearance, setAppearance } = useAppearanceTheme();
   const [ollama, setOllama] = useState<OllamaServerSettings>(emptyOllamaServerSettings);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('appearance');
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -195,12 +197,14 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   }, [vault]);
 
   return (
-    <div className="app-shell" data-theme={appearance.theme} data-document-style={appearance.documentStyle} style={{ ...appearanceVariables(appearance), '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
+    <div className={`app-shell theme-${appearance.theme === 'dark' ? 'dark' : 'light'}`} data-theme={appearance.theme} data-document-style={appearance.documentStyle} data-terminal={terminalOpen} style={{ ...appearanceVariables(appearance), '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
       <Topbar
         repositoryName={vault.repository.name}
         saveState={vault.saveState}
         assistantOpen={assistantOpen}
         onToggleAssistant={() => setAssistantOpen((open) => !open)}
+        terminalOpen={terminalOpen}
+        onToggleTerminal={() => setTerminalOpen((open) => !open)}
         onOpenSettings={() => openSettings()}
         onOpenVaultSwitcher={() => setSwitcherOpen(true)}
         onLogout={() => void logout()}
@@ -214,7 +218,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       />
       <div className="menu-backdrop" data-open={menuOpen} onClick={() => setMenuOpen(false)} />
       <Sidebar vault={vault} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} onResize={startSidebarResize} onResetWidth={() => setSidebarWidth(SIDEBAR_WIDTH_RANGE.default)} />
-      <main className="workspace">
+      <main className="workspace workspace-leaf-content markdown-rendered markdown-source-view mod-cm6 cm-s-obsidian" data-type="markdown">
         {vault.loading ? (
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : vault.activePath ? (
@@ -233,7 +237,13 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
         )}
       </main>
-      <Inspector vault={vault} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
+      {terminalOpen ? (
+        <Suspense fallback={<aside className="inspector terminal-panel"><div className="center-state"><LoaderCircle className="spin" /></div></aside>}>
+          <TerminalPanel onClose={() => setTerminalOpen(false)} />
+        </Suspense>
+      ) : (
+        <Inspector vault={vault} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
+      )}
 
       {publishTarget ? <BlogPublishDialog
         key={`${publishTarget.kind}:${publishTarget.path}`}

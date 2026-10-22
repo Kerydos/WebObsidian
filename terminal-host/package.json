@@ -1,0 +1,13 @@
+{
+  "name": "webobsidian-terminal-host",
+  "private": true,
+  "type": "module",
+  "description": "호스트에서 실행되는 WebObsidian 웹 터미널 PTY 데몬 (Docker 컨테이너가 유닉스 소켓으로 프록시)",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}
