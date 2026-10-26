@@ -36,7 +36,7 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
     setQuery,
     searchResults,
     selectNote,
-    createNote,
+    setCreateTarget,
     createFolder,
     openLocalFolder,
     dragOverTarget,
@@ -60,8 +60,8 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
     <aside className="sidebar" data-open={menuOpen}>
       <div className="sidebar-resizer" onPointerDown={onResize} onDoubleClick={onResetWidth} role="separator" aria-orientation="vertical" title="끌어서 너비 조절 (두 번 클릭하면 기본값)" />
       <div className="sidebar-actions">
-        <button className="primary-action" onClick={() => { void createNote(); onCloseMenu(); }}><FilePlus2 size={16} /> 새 노트</button>
-        <button className="icon-action" onClick={() => { void createNote('drawing'); onCloseMenu(); }} title="새 그림 (Excalidraw)"><PenTool size={17} /></button>
+        <button className="primary-action" onClick={() => { setCreateTarget('note'); onCloseMenu(); }}><FilePlus2 size={16} /> 새 노트</button>
+        <button className="icon-action" onClick={() => { setCreateTarget('drawing'); onCloseMenu(); }} title="새 그림 (Excalidraw)"><PenTool size={17} /></button>
         <button className="icon-action" onClick={() => void createFolder()} title="새 폴더"><FolderPlus size={17} /></button>
         <button className="icon-action" onClick={() => void openLocalFolder()} title="로컬 폴더 열기"><FolderOpen size={17} /></button>
       </div>

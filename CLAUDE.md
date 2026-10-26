@@ -198,7 +198,7 @@ docker compose up -d --build
 
 ## Excalidraw 그림
 
-사이드바의 펜 아이콘(새 그림)으로 `새그림.excalidraw.md`를 만든다. 경로가 `.excalidraw.md`로 끝나는 노트는 CodeMirror 대신 `@excalidraw/excalidraw` 편집기(지연 로드)로 열리며, 읽기 모드는 Excalidraw의 보기 모드다.
+사이드바의 펜 아이콘(새 그림)으로 `.excalidraw.md` 그림을 만든다. '새 노트'·'새 그림'은 한 줄 이름 입력 모달(`src/components/PromptDialog.tsx`, 상태는 `useVault`의 `createTarget`)을 띄우며, 기본값(노트 `MMDD_기록`, 그림 `새그림`)이 선택된 채 열리고 확장자는 생략해도 된다. 같은 이름이 있으면 모달 안에 오류를 보여 주고 만들기를 막는다. 선택한 폴더가 있으면 그 안에 만든다. 경로가 `.excalidraw.md`로 끝나는 노트는 CodeMirror 대신 `@excalidraw/excalidraw` 편집기(지연 로드)로 열리며, 읽기 모드는 Excalidraw의 보기 모드다.
 
 - 저장 형식은 Obsidian Excalidraw 플러그인과 같다: 프론트매터 `excalidraw-plugin: parsed`, `## Text Elements`(검색용 `텍스트 ^id`), `## Drawing` 아래 비압축 ```json 장면. 서버는 계속 `.md`만 다룬다.
 - 장면은 삭제되지 않은 요소, 참조 중인 이미지 파일(dataURL), `viewBackgroundColor`/`gridSize`만 저장한다(확대·스크롤은 저장하지 않아 이동만으로는 저장이 일어나지 않음). 변경은 400ms 모아서 기존 자동 저장 흐름으로 넘긴다.

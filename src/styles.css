@@ -369,3 +369,4 @@ button { color: inherit; }
 
 /* Excalidraw 그림 편집기: 작업 영역을 꽉 채운다. */
 .excalidraw-host { position: relative; height: 100%; }
+.prompt-error { margin: -6px 0 0; color: #b03a2e; font-size: 12.5px; }

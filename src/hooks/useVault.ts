@@ -12,6 +12,8 @@ import { EXCALIDRAW_SUFFIX, isExcalidrawPath, serializeExcalidraw } from '../lib
 
 export type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 
+export type NoteKind = 'note' | 'drawing';
+
 export type RenameTarget = { kind: 'note'; path: string } | { kind: 'folder'; path: string };
 
 function parentOf(path: string) {
@@ -39,6 +41,7 @@ export function useVault() {
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [createTarget, setCreateTarget] = useState<NoteKind | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<string | null>(null);
   const cancelRenameRef = useRef(false);
   const activePathRef = useRef(activePath);
@@ -273,17 +276,27 @@ export function useVault() {
     setRenameValue(path.split('/').at(-1) ?? path);
   };
 
-  const createNote = async (kind: 'note' | 'drawing' = 'note') => {
+  // 새 노트·그림은 선택한 폴더 안에 만든다. 이름 끝의 .md(.excalidraw.md)는 생략해도 된다.
+  const newNotePath = (kind: NoteKind, name: string) => {
+    const folder = folders.some((item) => item.path === selectedFolder) ? selectedFolder : null;
+    const base = name.trim().replace(kind === 'drawing' ? /(\.excalidraw)?(\.md)?$/i : /\.md$/i, '');
+    return normalizeVaultPath(`${folder ? `${folder}/` : ''}${base}${kind === 'drawing' ? EXCALIDRAW_SUFFIX : '.md'}`);
+  };
+
+  const suggestNoteName = (kind: NoteKind) => {
+    const prefix = parentOf(newNotePath(kind, 'x'));
+    const taken = new Set(entries.map((entry) => entry.path).filter((path) => parentOf(path) === prefix).map(fileName));
+    return uniqueBaseName(taken, kind === 'drawing' ? '새그림' : dailyNoteBaseName(), kind === 'drawing' ? EXCALIDRAW_SUFFIX : '.md');
+  };
+
+  const noteNameTaken = (kind: NoteKind, name: string) => entries.some((entry) => entry.path === newNotePath(kind, name));
+
+  const createNote = async (kind: NoteKind, name: string) => {
+    setCreateTarget(null);
     try {
       await saveActive();
-      const folder = folders.some((item) => item.path === selectedFolder) ? selectedFolder : null;
-      const prefix = folder ? `${folder}/` : '';
-      const taken = new Set(
-        entries.filter((entry) => entry.path.startsWith(prefix)).map((entry) => entry.path.slice(prefix.length)),
-      );
-      const suffix = kind === 'drawing' ? EXCALIDRAW_SUFFIX : '.md';
-      const base = uniqueBaseName(taken, kind === 'drawing' ? '새그림' : dailyNoteBaseName(), suffix);
-      const path = `${prefix}${base}${suffix}`;
+      const path = newNotePath(kind, name);
+      const base = fileName(path).replace(/(\.excalidraw)?\.md$/i, '');
       const created = await repository.create(path, kind === 'drawing' ? serializeExcalidraw({ elements: [] }) : `# ${base}\n\n`);
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
@@ -291,7 +304,6 @@ export function useVault() {
       setEditingPath(path);
       setEditorValue(created.content);
       setSaveState('saved');
-      startRenameNote(path);
     } catch (cause) {
       setError(messageOf(cause));
     }
@@ -530,6 +542,10 @@ export function useVault() {
     handleRenameBlur,
     handleRenameKeyDown,
     createNote,
+    createTarget,
+    setCreateTarget,
+    suggestNoteName,
+    noteNameTaken,
     createFolder,
     moveIntoFolder,
     moveToRoot,

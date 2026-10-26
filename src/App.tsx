@@ -5,6 +5,7 @@ import { ServerVaultRepository } from './lib/vault/server';
 import { OpfsVaultRepository } from './lib/vault/opfs';
 import { LoginScreen } from './components/LoginScreen';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { PromptDialog } from './components/PromptDialog';
 import { SettingsPanel, type SettingsTab } from './components/SettingsPanel';
 import { BlogPublishDialog } from './components/BlogPublishDialog';
 import { Topbar } from './components/layout/Topbar';
@@ -172,6 +173,8 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   }, []);
 
   const closeSwitcher = useCallback(() => setSwitcherOpen(false), []);
+  const { setCreateTarget } = vault;
+  const closeCreateDialog = useCallback(() => setCreateTarget(null), [setCreateTarget]);
 
   // 볼트 전환: 진행 중인 저장을 마친 뒤 새 저장소 어댑터로 전체를 다시 불러온다.
   const selectServerVault = useCallback(async () => {
@@ -289,6 +292,18 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           onSelectLocal={() => void selectLocalFolder()}
           onSelectOpfs={() => void selectOpfsVault()}
           onClose={closeSwitcher}
+        />
+      ) : null}
+      {vault.createTarget ? (
+        <PromptDialog
+          key={vault.createTarget}
+          title={vault.createTarget === 'drawing' ? '새 그림' : '새 노트'}
+          initialValue={vault.suggestNoteName(vault.createTarget)}
+          placeholder="파일 이름"
+          confirmLabel="만들기"
+          validate={(name) => vault.noteNameTaken(vault.createTarget!, name) ? '같은 이름의 노트가 이미 있습니다.' : undefined}
+          onConfirm={(name) => void vault.createNote(vault.createTarget!, name)}
+          onCancel={closeCreateDialog}
         />
       ) : null}
       {vault.deleteTarget ? (
