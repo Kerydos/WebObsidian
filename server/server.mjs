@@ -7,7 +7,6 @@ import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AuthError, AuthManager, expiredSessionCookie, readSessionToken, sessionCookie } from './auth.mjs';
 import { FileVault, VaultError } from './vault.mjs';
-import { OllamaError, OllamaSettingsStore, proxyOllama, publicSettingsView } from './ollama.mjs';
 import { VaultWatcher } from './watcher.mjs';
 import { BlogError, BlogSettingsStore, listBlogFolders, publishBlog } from './blog.mjs';
 
@@ -101,10 +100,6 @@ const vault = new FileVault(vaultRoot);
 await vault.initialize();
 const watcher = new VaultWatcher(vaultRoot, vault.changes);
 watcher.start();
-// Ollama Cloud 설정(공유 API 키, 모델)은 vault 루트의 dotfile에 저장해 모든 브라우저가 공유한다.
-const ollamaSettings = new OllamaSettingsStore(
-  process.env.WEBOBSIDIAN_OLLAMA_SETTINGS_FILE ?? resolve(vaultRoot, '.webobsidian-ollama.json'),
-);
 
 const blogSettings = new BlogSettingsStore(resolve(vaultRoot, '.webobsidian-blog.json'));
 
@@ -131,7 +126,7 @@ const server = createServer(async (request, response) => {
         'Set-Cookie': expiredSessionCookie({ secure: secureCookie }),
       });
     }
-    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/ollama/') || url.pathname.startsWith('/api/blog/')) && !auth.isAuthenticated(sessionToken)) {
+    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/blog/')) && !auth.isAuthenticated(sessionToken)) {
       return sendJson(response, 401, { error: '로그인이 필요합니다.' });
     }
     if (url.pathname === '/api/blog/settings') {
@@ -207,29 +202,10 @@ const server = createServer(async (request, response) => {
       });
       return;
     }
-    // Ollama Cloud: 설정은 서버 파일에 저장하고, 프록시는 저장된 키를 사용한다(헤더 직접 전달도 허용).
-    if (url.pathname === '/api/ollama/settings') {
-      if (request.method === 'GET') {
-        return sendJson(response, 200, publicSettingsView(await ollamaSettings.read()));
-      }
-      if (request.method === 'PUT') {
-        const body = await readJson(request);
-        return sendJson(response, 200, await ollamaSettings.update(body));
-      }
-    }
-    if (url.pathname === '/api/ollama/tags' && request.method === 'GET') {
-      await proxyOllama(request, response, url.pathname, null, (await ollamaSettings.read()).apiKey);
-      return;
-    }
-    if (url.pathname === '/api/ollama/chat' && request.method === 'POST') {
-      const body = await readJson(request);
-      await proxyOllama(request, response, url.pathname, body, (await ollamaSettings.read()).apiKey);
-      return;
-    }
     if (url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'API를 찾을 수 없습니다.' });
     await serveStatic(request, response, url.pathname);
   } catch (error) {
-    const status = error instanceof VaultError || error instanceof AuthError || error instanceof OllamaError || error instanceof BlogError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
+    const status = error instanceof VaultError || error instanceof AuthError || error instanceof BlogError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
     if (status === 500) console.error(error);
     sendJson(response, status, { error: status === 500 ? '서버 오류가 발생했습니다.' : error.message });
   }

@@ -39,7 +39,7 @@
   --dise-h4: hsl(218, 40%, 69%);
   --dise-h5: hsl(218, 28%, 66%);
 }
-.app-shell :is(.topbar, .sidebar, .inspector, .assistant-meta, .assistant-composer) {
+.app-shell :is(.topbar, .sidebar, .inspector) {
   background: var(--term-bg-elevated);
   color: var(--term-fg);
   border-color: var(--term-border);
@@ -86,8 +86,6 @@
 .workspace .cm-selectionBackground, .workspace .cm-focused .cm-selectionBackground { background: var(--text-selection) !important; }
 .theme-dark .workspace .cm-live-highlight { background: #bb800966; color: #e6edf3; }
 .theme-dark .workspace .cm-line.cm-live-callout { background: var(--background-primary-alt); color: var(--text-normal); }
-.app-shell :is(.assistant-bubble, .assistant-composer textarea) { font-family: var(--font-text); font-size: var(--font-text-size); line-height: 1.5; }
-/* The web assistant has no Agent Client tool/permission rows; those original rules stay dormant. */
 .nav-folder-title-content { display: inline-flex; align-items: center; gap: 6px; }
 .nav-folder-title-content::before { content: ''; display: inline-block; width: 14px; height: 14px; flex-shrink: 0; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M3 5h7l2 3h9v12H3z'/%3E%3C/svg%3E") center / contain no-repeat; }
 .folder-item > .lucide-folder { display: none; }

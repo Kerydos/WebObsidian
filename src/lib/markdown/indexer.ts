@@ -1,3 +1,5 @@
+import { isExcalidrawPath } from '../excalidraw';
+
 export interface WikiLink {
   target: string;
   alias?: string;
@@ -29,6 +31,8 @@ export function indexMarkdown(path: string, markdown: string): NoteIndex {
   let inFence = false;
   const frontmatterEnd = lines[0]?.trim() === '---' ? lines.findIndex((line, index) => index > 0 && line.trim() === '---') : -1;
   let title = path.split('/').at(-1)?.replace(/\.md$/i, '') ?? path;
+  // 그림 파일의 마크다운 부분은 Excalidraw 데이터 틀이라 제목·헤딩으로 쓰지 않는다.
+  if (isExcalidrawPath(path)) return { path, title: title.replace(/\.excalidraw$/i, ''), tags: [], links: [], headings: [] };
 
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index];

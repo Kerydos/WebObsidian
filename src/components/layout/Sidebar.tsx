@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, ChevronRight, FilePlus2, Folder, FolderOpen, FolderPlus, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus2, PenTool, Folder, FolderOpen, FolderPlus, Search, Trash2 } from 'lucide-react';
 import { buildVaultTree, type NoteSortOrder } from '../../lib/vault/tree';
 import type { VaultController } from '../../hooks/useVault';
 
@@ -61,6 +61,7 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
       <div className="sidebar-resizer" onPointerDown={onResize} onDoubleClick={onResetWidth} role="separator" aria-orientation="vertical" title="끌어서 너비 조절 (두 번 클릭하면 기본값)" />
       <div className="sidebar-actions">
         <button className="primary-action" onClick={() => { void createNote(); onCloseMenu(); }}><FilePlus2 size={16} /> 새 노트</button>
+        <button className="icon-action" onClick={() => { void createNote('drawing'); onCloseMenu(); }} title="새 그림 (Excalidraw)"><PenTool size={17} /></button>
         <button className="icon-action" onClick={() => void createFolder()} title="새 폴더"><FolderPlus size={17} /></button>
         <button className="icon-action" onClick={() => void openLocalFolder()} title="로컬 폴더 열기"><FolderOpen size={17} /></button>
       </div>
@@ -219,7 +220,7 @@ export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }
                           startRenameNote(row.entry.path);
                         }}
                       >
-                        <span>{row.entry.name.replace(/\.md$/i, '')}</span>
+                        <span>{row.entry.name.replace(/(\.excalidraw)?\.md$/i, '')}</span>
                         <ChevronRight size={14} />
                       </button>
                       <button

@@ -1,27 +1,21 @@
 import { useEffect, useId, useState } from 'react';
-import { Cloud, Send, Palette, RotateCcw, X } from 'lucide-react';
+import { Send, Palette, RotateCcw, X } from 'lucide-react';
 import { AppearanceSettingsSection } from './AppearanceSettings';
-import { OllamaSettingsSection } from './OllamaSettings';
 import { defaultAppearance, type AppearanceSettings } from '../lib/settings/appearance';
-import type { OllamaServerSettings } from '../lib/ai/ollamaCloud';
 
-export type SettingsTab = 'appearance' | 'ollama' | 'blog';
+export type SettingsTab = 'appearance' | 'blog';
 
 interface SettingsPanelProps {
   appearance: AppearanceSettings;
   onAppearanceChange: (settings: AppearanceSettings) => void;
-  ollama: OllamaServerSettings;
-  onOllamaUpdated: (settings: OllamaServerSettings) => void;
   initialTab?: SettingsTab;
   onClose: () => void;
 }
 
-// 화면 설정과 Ollama Cloud 설정을 탭으로 나눈 설정 창.
+// 화면 설정과 블로그 발행 설정을 탭으로 나눈 설정 창.
 export function SettingsPanel({
   appearance,
   onAppearanceChange,
-  ollama,
-  onOllamaUpdated,
   initialTab = 'appearance',
   onClose,
 }: SettingsPanelProps) {
@@ -60,23 +54,13 @@ export function SettingsPanel({
           >
             <Palette size={15} /> 화면
           </button>
-          <button
-            type="button"
-            role="tab"
-            id="settings-tab-ollama"
-            aria-selected={tab === 'ollama'}
-            className="settings-tab"
-            onClick={() => setTab('ollama')}
-          >
-            <Cloud size={15} /> Ollama Cloud
-          </button>
           <button type="button" role="tab" id="settings-tab-blog" aria-selected={tab === 'blog'} className="settings-tab" onClick={() => setTab('blog')}><Send size={15} /> 블로그</button>
         </div>
 
         <div className="settings-content" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
           {tab === 'appearance'
             ? <AppearanceSettingsSection settings={appearance} onChange={onAppearanceChange} />
-            : tab === 'ollama' ? <OllamaSettingsSection settings={ollama} onUpdated={onOllamaUpdated} /> : <BlogSettingsSection />}
+            : <BlogSettingsSection />}
         </div>
 
         <footer className="settings-footer">

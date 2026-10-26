@@ -5,6 +5,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalPanelProps {
+  height: number;
   onClose: () => void;
 }
 
@@ -26,7 +27,7 @@ const terminalTheme = {
   white: '#e8e2d8', brightWhite: '#fbf7f0',
 };
 
-export function TerminalPanel({ onClose }: TerminalPanelProps) {
+export function TerminalPanel({ height, onClose }: TerminalPanelProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ConnectionState>('connecting');
   const [attempt, setAttempt] = useState(0);
@@ -78,7 +79,7 @@ export function TerminalPanel({ onClose }: TerminalPanelProps) {
   }, [attempt]);
 
   return (
-    <aside className="inspector terminal-panel" aria-label="웹 터미널">
+    <aside className="inspector terminal-panel" aria-label="웹 터미널" style={{ height }}>
       <div className="inspector-heading">
         <div><span>웹 터미널</span><strong>{state === 'open' ? 'tmux: webobsidian' : state === 'connecting' ? '연결 중…' : '연결 끊김'}</strong></div>
         <div className="terminal-actions">

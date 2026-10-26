@@ -1,11 +1,9 @@
-import { BookOpen, Bot, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles, SquareTerminal } from 'lucide-react';
+import { BookOpen, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles, SquareTerminal } from 'lucide-react';
 import type { SaveState } from '../../hooks/useVault';
 
 interface TopbarProps {
   repositoryName: string;
   saveState: SaveState;
-  assistantOpen: boolean;
-  onToggleAssistant: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
   onOpenSettings: () => void;
@@ -20,7 +18,7 @@ interface TopbarProps {
   onToggleMenu: () => void;
 }
 
-export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssistant, terminalOpen, onToggleTerminal, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
+export function Topbar({ repositoryName, saveState, terminalOpen, onToggleTerminal, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -48,15 +46,6 @@ export function Topbar({ repositoryName, saveState, assistantOpen, onToggleAssis
           {editing ? <><BookOpen size={15} /><span className="btn-label">읽기</span></> : <><PencilLine size={15} /><span className="btn-label">편집</span></>}
         </button> : null}
         {onPublish ? <button className="logout-button" onClick={onPublish} title={`선택한 ${publishLabel}`}><Send size={15} /><span className="btn-label">{publishLabel}</span></button> : null}
-        <button
-          className={assistantOpen ? 'topbar-button active' : 'topbar-button'}
-          onClick={onToggleAssistant}
-          title="AI 도우미"
-          aria-label="AI 도우미 열기"
-          aria-pressed={assistantOpen}
-        >
-          <Bot size={16} />
-        </button>
         <button
           className={terminalOpen ? 'topbar-button active' : 'topbar-button'}
           onClick={onToggleTerminal}

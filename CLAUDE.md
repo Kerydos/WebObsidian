@@ -30,7 +30,6 @@
 - `server/server.mjs`: 정적 파일 및 HTTP API 서버
 - `server/auth.mjs`: 로그인, 세션, 로그아웃, 로그인 시도 제한(최소 비밀번호 길이는 `minLength` 옵션으로 조정 가능, 기본 12자)
 - `server/vault.mjs`: 마크다운 파일 읽기·쓰기, 경로 검증, 충돌 감지
-- `server/ollama.mjs`: Ollama Cloud API 프록시(모델 목록, 스트리밍 채팅)와 서버 측 공유 설정 저장소
 - `server/watcher.mjs`: 볼트 폴더 감시(fs.watch + 폴링 폴백), 변경을 SSE 버스로 전달
 - `src/lib/vault/server.ts`: 프론트엔드의 서버 Vault 저장소 어댑터
 - `src/lib/vault/localFs.ts`: Chromium 계열 브라우저의 로컬 폴더 연결 지원
@@ -40,15 +39,12 @@
 - `src/hooks/useAppearanceTheme.ts`: 테마·글꼴 설정 상태와 localStorage 유지
 - `src/components/layout/Topbar.tsx` · `Sidebar.tsx` · `Inspector.tsx`: 상단 바 / 좌측 트리 / 우측 인스펙터
 - `src/components/dialogs/VaultSwitcher.tsx`: 볼트 저장소 전환 모달(상단 vault pill 클릭)
-- `src/lib/settings/ollama.ts`: 과거 localStorage 저장 설정의 마이그레이션 헬퍼
-- `src/lib/ai/ollamaCloud.ts`: Ollama Cloud 클라이언트(공유 설정 조회·저장, 모델 목록, NDJSON 스트리밍 채팅)
 - `src/components/MarkdownEditor.tsx`: CodeMirror 편집기와 라이브 프리뷰 연결
-- `src/components/SettingsPanel.tsx`: 탭 구조 설정 창(화면 / Ollama Cloud)
-- `src/components/OllamaSettings.tsx`: API 키 입력과 모델 선택 설정 화면
-- `src/components/AssistantPanel.tsx`: Ollama Cloud 기반 AI 도우미 패널
+- `src/components/SettingsPanel.tsx`: 탭 구조 설정 창(화면 / 블로그)
 - `src/components/editor/livePreview.ts`: 인플레이스 마크다운 렌더링 구현(콜아웃, 프론트매터, 표 셀 인라인 렌더링 포함)
 - `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵, `::` 시각 삽입 스니펫
 - `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
+- `src/components/ExcalidrawEditor.tsx` · `src/lib/excalidraw.ts`: Excalidraw 그림 편집기와 `*.excalidraw.md` 파싱·직렬화
 - `src/components/TerminalPanel.tsx`: 오른쪽 열에 표시되는 xterm.js 웹 터미널(상단 터미널 버튼으로 토글)
 - `terminal-host/server.mjs`: **호스트에서** 실행되는 웹 터미널 PTY 데몬(node-pty + ws, 유닉스 소켓). Docker 이미지에 포함되지 않는다
 - `terminal-host/webobsidian-terminal.service`: 위 데몬의 systemd user 유닛 파일
@@ -103,8 +99,6 @@ docker compose up -d --build
 - `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
 - `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
 - `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
-- `WEBOBSIDIAN_OLLAMA_HOST`: 선택. Ollama Cloud 프록시의 업스트림 주소(기본값 `https://ollama.com`)
-- `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`: 선택. Ollama Cloud 공유 설정(API 키, 모델) 파일 경로(기본값 vault 안의 `.webobsidian-ollama.json`)
 - `WEBOBSIDIAN_TERMINAL_SOCKET`: 선택. 웹 터미널 호스트 데몬의 유닉스 소켓 경로. 비어 있으면 터미널 기능이 꺼지고 `/api/terminal`은 503을 돌려준다
 - `HOST`: 서버 바인딩 주소
 - `PORT`: 서버 포트
@@ -187,7 +181,7 @@ docker compose up -d --build
 
 ## 설정 창
 
-상단 톱니바퀴 버튼에서 설정 창을 열 수 있다. 설정 창은 '화면'과 'Ollama Cloud' 두 개 탭으로 구성된다(`src/components/SettingsPanel.tsx`). 모든 설정은 마크다운 파일이나 서버에 기록하지 않고 브라우저의 `localStorage`에 저장된다.
+상단 톱니바퀴 버튼에서 설정 창을 열 수 있다. 설정 창은 '화면'과 '블로그' 두 개 탭으로 구성된다(`src/components/SettingsPanel.tsx`). 화면 설정은 브라우저의 `localStorage`에, 블로그 발행 API 키는 서버(vault 안의 `.webobsidian-blog.json`)에 저장된다. 과거의 AI 도우미(Ollama Cloud) 기능은 2026-10-26 사용자 요청으로 제거했다.
 
 ### 화면 탭
 
@@ -202,45 +196,18 @@ docker compose up -d --build
 
 설정 스키마와 안전한 파싱은 `src/lib/settings/appearance.ts`, UI는 `src/components/AppearanceSettings.tsx`에 있다. 저장된 값이 손상되거나 지원 범위를 벗어나면 항목별 기본값 또는 허용 범위로 복구한다.
 
-## Ollama Cloud 연동
+## Excalidraw 그림
 
-ollama.com의 클라우드 모델(gpt-oss:120b, qwen3.5 등)을 사용하는 AI 도우미 기능이다.
+사이드바의 펜 아이콘(새 그림)으로 `새그림.excalidraw.md`를 만든다. 경로가 `.excalidraw.md`로 끝나는 노트는 CodeMirror 대신 `@excalidraw/excalidraw` 편집기(지연 로드)로 열리며, 읽기 모드는 Excalidraw의 보기 모드다.
 
-### 설정 저장 위치(서버 공유)
-
-- API 키와 모델은 **서버**에 저장되며 로그인한 모든 브라우저에서 함께 사용된다.
-- 저장 파일은 `WEBOBSIDIAN_OLLAMA_SETTINGS_FILE`로 변경할 수 있고 기본값은 vault 폴더 안의 `.webobsidian-ollama.json`이다(0600 권한, JSON). 이 파일은 `.md`가 아니므로 노트 목록·vault API·파일 워처 어디에도 노출되지 않고, 볼트가 저장소 밖(`~/Documents/SecondBrain`)에 있어 커밋되지도 않는다. Docker에서 vault 볼륨에 포함되므로 컨테이너 재생성 후에도 유지된다.
-- 설정 조회는 키 원문을 돌려주지 않고 `{ hasApiKey, apiKeyHint(마스킹), model }` 뷰만 제공한다.
-- 과거 버전이 브라우저 localStorage(`webobsidian:ollama:v1`)에 저장하던 키는 앱 시작 시 서버에 키가 없으면 자동으로 서버로 이전된 뒤 삭제한다(`src/lib/settings/ollama.ts` 참고).
-
-### 설정 창(Ollama Cloud 탭)
-
-- API 키 입력 후 '저장' 버튼으로 서버에 저장한다. 표시/숨김 토글, 저장된 키 삭제(교체는 새 키 저장)를 지원한다.
-- 모델 선택: '모델 목록 불러오기' 버튼으로 계정의 클라우드 모델 목록을 가져와 선택하거나, 이름을 직접 입력할 수 있다(직접 입력은 0.6초 후 자동 저장). 모델도 서버에 저장되어 모든 브라우저에 적용된다.
-
-### 동작 구조
-
-- 브라우저는 직접 ollama.com에 접속하지 않고 같은 서버의 프록시를 사용한다(CORS·키 노출 회피).
-  - `GET /api/ollama/settings` / `PUT /api/ollama/settings` — 공유 설정 조회·수정(로그인 필요)
-  - `GET /api/ollama/tags` → `https://ollama.com/api/tags`(모델 목록)
-  - `POST /api/ollama/chat` → `https://ollama.com/api/chat`(채팅, `stream: true`면 NDJSON 그대로 전달)
-- 모든 `/api/ollama/*` 엔드포인트는 로그인 세션이 필요하다(`/api/vault`와 동일 정책). 프록시는 서버에 저장된 API 키를 사용하되, 요청의 `Authorization: Bearer` 헤더로 직접 전달된 키가 있으면 그것을 우선한다.
-- 채팅 요청은 `model`, `messages`, `stream` 필드만 허용 목록으로 전달한다(`sanitizeChatRequest`). 업스트림 401/403/404/429는 같은 상태 코드로, 그 외는 502로 매핑하고 업스트림 오류 메시지를 그대로 보여 준다. 키가 어디에도 없으면 401('저장된 Ollama Cloud API 키가 없습니다')을 반환하며, 이 401은 세션 만료 401과 구분해 로그아웃 처리하지 않는다.
-- 업스트림 주소는 `WEBOBSIDIAN_OLLAMA_HOST`로 바꿀 수 있다(기본 `https://ollama.com`, 테스트용).
-- 구현은 `server/ollama.mjs`(프록시 + `OllamaSettingsStore`)와 `src/lib/ai/ollamaCloud.ts`(클라이언트)에 있다.
-
-### AI 도우미 패널
-
-상단 봇 버튼으로 열고 닫는다(`src/components/AssistantPanel.tsx`).
-
-- 서버에 저장된 모델과 대화하며 응답이 스트리밍으로 표시된다. Enter 전송, Shift+Enter 줄바꿈, 생성 중 '중지' 가능.
-- '현재 노트 참조'를 켜면 열려 있는 노트 제목과 내용(최대 8000자)을 맥락으로 함께 보낸다.
-- 어시스턴트 답변은 '노트에 삽입'(현재 노트 끝에 추가, 기존 자동 저장 흐름을 따름)하거나 '복사'할 수 있다.
-- 대화 상태는 메모리에만 유지되며 패널을 닫아도 유지되고, 새로고침하면 사라진다.
+- 저장 형식은 Obsidian Excalidraw 플러그인과 같다: 프론트매터 `excalidraw-plugin: parsed`, `## Text Elements`(검색용 `텍스트 ^id`), `## Drawing` 아래 비압축 ```json 장면. 서버는 계속 `.md`만 다룬다.
+- 장면은 삭제되지 않은 요소, 참조 중인 이미지 파일(dataURL), `viewBackgroundColor`/`gridSize`만 저장한다(확대·스크롤은 저장하지 않아 이동만으로는 저장이 일어나지 않음). 변경은 400ms 모아서 기존 자동 저장 흐름으로 넘긴다.
+- 이름 변경 입력란은 `.excalidraw`를 숨기고 커밋 시 다시 붙인다. 인덱서는 그림 파일의 제목·헤딩·링크를 뽑지 않는다.
+- 제한: Obsidian의 압축 형식(```compressed-json)은 읽지 못한다(Obsidian에서 'Decompress current Excalidraw file' 후 사용). Excalidraw 손글씨 폰트는 번들하지 않아 기본 CDN에서 받는다. 열려 있는 그림의 원격 변경은 다시 열어야 반영된다.
 
 ## 웹 터미널
 
-상단 바의 터미널 버튼을 누르면 오른쪽 인스펙터 자리에 xterm.js 터미널이 열린다(열려 있을 때 오른쪽 열이 `min(640px, 45vw)`로 넓어진다). 목적은 호스트의 `claude`, `codex` 같은 CLI를 볼트 폴더에서 바로 실행해 노트를 참조·작성하거나 리서치하는 것이다.
+상단 바의 터미널 버튼을 누르면 오른쪽 열의 인스펙터 아래에 xterm.js 터미널이 열린다(열려 있을 때 오른쪽 열이 `min(640px, 45vw)`로 넓어진다). 인스펙터와 터미널 사이 경계를 끌어 터미널 높이를 조절할 수 있고(최소 120px, 더블클릭으로 기본 360px), 값은 `webobsidian:terminalheight:v1` localStorage에 저장된다. 오른쪽 열 전체는 `.inspect-column`(flex column)이 감싼다. 목적은 호스트의 `claude`, `codex` 같은 CLI를 볼트 폴더에서 바로 실행해 노트를 참조·작성하거나 리서치하는 것이다.
 
 구조:
 
@@ -270,7 +237,7 @@ npm run lint
 npm run build
 ```
 
-마지막 확인 결과는 테스트 15개 파일, 총 119개 테스트 통과와 프로덕션 빌드 성공이다. 웹 터미널은 데몬·서버·클라이언트를 임시 소켓과 포트로 띄워 미인증 401, 로그인 후 PTY 출력, 작업 디렉터리, 리사이즈 반영을 실제 WebSocket 왕복으로 확인했다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. Ollama Cloud 프록시는 `server/ollama.test.mjs`가 로컬 목업 업스트림 서버를 띄워 검증하며, 서버 라우팅·인증 게이트·NDJSON 스트리밍까지 실제 HTTP 왕복으로 확인했다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
+마지막 확인 결과는 테스트 13개 파일, 총 92개 테스트 통과와 프로덕션 빌드 성공이다. 웹 터미널은 데몬·서버·클라이언트를 임시 소켓과 포트로 띄워 미인증 401, 로그인 후 PTY 출력, 작업 디렉터리, 리사이즈 반영을 실제 WebSocket 왕복으로 확인했다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 

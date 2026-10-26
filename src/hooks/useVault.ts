@@ -8,6 +8,7 @@ import { backlinksFor, indexMarkdown, resolveLink } from '../lib/markdown/indexe
 import { VaultSearchIndex } from '../lib/search/searchIndex';
 import { db } from '../lib/cache/database';
 import { messageOf } from '../lib/message';
+import { EXCALIDRAW_SUFFIX, isExcalidrawPath, serializeExcalidraw } from '../lib/excalidraw';
 
 export type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 
@@ -264,7 +265,7 @@ export function useVault() {
 
   const startRenameNote = (path: string) => {
     setRenaming({ kind: 'note', path });
-    setRenameValue(path.split('/').at(-1)?.replace(/\.md$/i, '') ?? path);
+    setRenameValue(path.split('/').at(-1)?.replace(/(\.excalidraw)?\.md$/i, '') ?? path);
   };
 
   const startRenameFolder = (path: string) => {
@@ -272,7 +273,7 @@ export function useVault() {
     setRenameValue(path.split('/').at(-1) ?? path);
   };
 
-  const createNote = async () => {
+  const createNote = async (kind: 'note' | 'drawing' = 'note') => {
     try {
       await saveActive();
       const folder = folders.some((item) => item.path === selectedFolder) ? selectedFolder : null;
@@ -280,9 +281,10 @@ export function useVault() {
       const taken = new Set(
         entries.filter((entry) => entry.path.startsWith(prefix)).map((entry) => entry.path.slice(prefix.length)),
       );
-      const base = uniqueBaseName(taken, dailyNoteBaseName(), '.md');
-      const path = `${prefix}${base}.md`;
-      const created = await repository.create(path, `# ${base}\n\n`);
+      const suffix = kind === 'drawing' ? EXCALIDRAW_SUFFIX : '.md';
+      const base = uniqueBaseName(taken, kind === 'drawing' ? '새그림' : dailyNoteBaseName(), suffix);
+      const path = `${prefix}${base}${suffix}`;
+      const created = await repository.create(path, kind === 'drawing' ? serializeExcalidraw({ elements: [] }) : `# ${base}\n\n`);
       setEntries((previous) => [...previous, created].sort((a, b) => a.path.localeCompare(b.path)));
       setDocuments((previous) => new Map(previous).set(path, created));
       setActivePath(path);
@@ -363,7 +365,9 @@ export function useVault() {
     if (!trimmed) return;
     const parent = parentOf(target.path);
     if (target.kind === 'note') {
-      const newPath = ensureMarkdownPath(parent ? `${parent}/${trimmed}` : trimmed);
+      // 그림은 이름 입력란에 .excalidraw를 숨겼으므로 다시 붙여 그림으로 남게 한다.
+      const name = isExcalidrawPath(target.path) && !/\.excalidraw(\.md)?$/i.test(trimmed) ? `${trimmed}.excalidraw` : trimmed;
+      const newPath = ensureMarkdownPath(parent ? `${parent}/${name}` : name);
       await moveNote(target.path, newPath);
     } else {
       const newPath = normalizeVaultPath(parent ? `${parent}/${trimmed}` : trimmed);

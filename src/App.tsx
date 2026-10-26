@@ -7,7 +7,6 @@ import { LoginScreen } from './components/LoginScreen';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { SettingsPanel, type SettingsTab } from './components/SettingsPanel';
 import { BlogPublishDialog } from './components/BlogPublishDialog';
-import { AssistantPanel } from './components/AssistantPanel';
 import { Topbar } from './components/layout/Topbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { Inspector } from './components/layout/Inspector';
@@ -17,13 +16,22 @@ import { useVaultSync } from './hooks/useVaultSync';
 import { useAppearanceTheme } from './hooks/useAppearanceTheme';
 import { appearanceVariables } from './lib/settings/appearance';
 import { indexMarkdown } from './lib/markdown/indexer';
-import { clearLegacyOllamaSettings, readLegacyOllamaSettings } from './lib/settings/ollama';
-import { emptyOllamaServerSettings, fetchOllamaSettings, saveOllamaSettings, type OllamaServerSettings } from './lib/ai/ollamaCloud';
+import { isExcalidrawPath } from './lib/excalidraw';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
+const ExcalidrawEditor = lazy(() => import('./components/ExcalidrawEditor'));
 const TerminalPanel = lazy(() => import('./components/TerminalPanel'));
 const SIDEBAR_WIDTH_STORAGE_KEY = 'webobsidian:sidebarwidth:v1';
 const SIDEBAR_WIDTH_RANGE = { min: 180, max: 560, default: 252 };
+const TERMINAL_HEIGHT_STORAGE_KEY = 'webobsidian:terminalheight:v1';
+const TERMINAL_HEIGHT_RANGE = { min: 120, default: 360 };
+
+function clampTerminalHeight(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return TERMINAL_HEIGHT_RANGE.default;
+  // 인스펙터 머리글이 최소한 보이도록 위쪽 140px은 남긴다.
+  const max = Math.max(TERMINAL_HEIGHT_RANGE.min, window.innerHeight - 52 - 140);
+  return Math.min(max, Math.max(TERMINAL_HEIGHT_RANGE.min, Math.round(value)));
+}
 
 function clampSidebarWidth(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return SIDEBAR_WIDTH_RANGE.default;
@@ -67,9 +75,12 @@ export function App() {
 function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const vault = useVault();
   const { appearance, setAppearance } = useAppearanceTheme();
-  const [ollama, setOllama] = useState<OllamaServerSettings>(emptyOllamaServerSettings);
-  const [assistantOpen, setAssistantOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(() => {
+    try { return clampTerminalHeight(Number(window.localStorage.getItem(TERMINAL_HEIGHT_STORAGE_KEY))); }
+    catch { return TERMINAL_HEIGHT_RANGE.default; }
+  });
+  const inspectColumnRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('appearance');
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -89,6 +100,27 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     try { window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth)); } catch { /* Session-only setting. */ }
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    try { window.localStorage.setItem(TERMINAL_HEIGHT_STORAGE_KEY, String(terminalHeight)); } catch { /* Session-only setting. */ }
+  }, [terminalHeight]);
+
+  // 인스펙터와 터미널 사이 경계를 끌어 터미널 높이를 바꾼다(열 아래쪽 끝에서 포인터까지의 거리).
+  const startTerminalResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const move = (moveEvent: PointerEvent) => {
+      const bottom = inspectColumnRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+      setTerminalHeight(clampTerminalHeight(bottom - moveEvent.clientY));
+    };
+    const stop = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+      document.body.style.userSelect = '';
+    };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', stop);
+  }, []);
+
   const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const move = (moveEvent: PointerEvent) => setSidebarWidth(clampSidebarWidth(moveEvent.clientX));
@@ -102,30 +134,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     document.addEventListener('pointerup', stop);
   }, []);
 
-  // 서버에 저장된 Ollama Cloud 설정을 불러온다. 과거 버전이 이 브라우저에 저장해 둔 키가
-  // 있고 서버에 아직 키가 없으면 한 번만 서버로 이전해 모든 브라우저가 공유하게 한다.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        let settings = await fetchOllamaSettings();
-        const legacy = readLegacyOllamaSettings();
-        if (legacy.apiKey && !settings.hasApiKey) {
-          settings = await saveOllamaSettings({
-            apiKey: legacy.apiKey,
-            ...(settings.model ? {} : legacy.model ? { model: legacy.model } : {}),
-          });
-        }
-        if (legacy.apiKey) clearLegacyOllamaSettings();
-        if (!cancelled) setOllama(settings);
-      } catch {
-        // 설정 로드에 실패하면 미설정 상태를 유지한다(패널이 안내를 표시).
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useVaultSync({
     repository: vault.repository,
@@ -163,15 +171,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSettingsOpen(true);
   }, []);
 
-  // AI 도우미 답변을 현재 노트 끝에 추가한다. 편집 내용은 기존 자동 저장 흐름을 따른다.
-  const { editorValueRef, setEditorValue } = vault;
-  const insertAssistantText = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const current = editorValueRef.current;
-    setEditorValue(current.trim() ? `${current}\n\n${trimmed}\n` : `${trimmed}\n`);
-  }, [editorValueRef, setEditorValue]);
-
   const closeSwitcher = useCallback(() => setSwitcherOpen(false), []);
 
   // 볼트 전환: 진행 중인 저장을 마친 뒤 새 저장소 어댑터로 전체를 다시 불러온다.
@@ -201,8 +200,6 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       <Topbar
         repositoryName={vault.repository.name}
         saveState={vault.saveState}
-        assistantOpen={assistantOpen}
-        onToggleAssistant={() => setAssistantOpen((open) => !open)}
         terminalOpen={terminalOpen}
         onToggleTerminal={() => setTerminalOpen((open) => !open)}
         onOpenSettings={() => openSettings()}
@@ -223,7 +220,13 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <div className="center-state"><LoaderCircle className="spin" /><p>볼트를 여는 중입니다</p></div>
         ) : vault.activePath ? (
           <Suspense fallback={<div className="center-state"><LoaderCircle className="spin" /></div>}>
-            <MarkdownEditor
+            {isExcalidrawPath(vault.activePath) ? <ExcalidrawEditor
+              key={`${vault.activePath}:${vault.editing}`}
+              value={vault.editorValue}
+              readOnly={!vault.editing}
+              dark={appearance.theme === 'dark'}
+              onChange={vault.setEditorValue}
+            /> : <MarkdownEditor
               key={`${vault.activePath}:${vault.editing}`}
               value={vault.editorValue}
               readOnly={!vault.editing}
@@ -231,19 +234,31 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               onNavigateWikiLink={vault.navigateLink}
               onReady={(scrollToLine) => { scrollToHeadingRef.current = scrollToLine; }}
               onScrollLine={(line) => setReaderPosition((current) => current?.path === vault.activePath && current?.line === line ? current : { path: vault.activePath!, line })}
-            />
+            />}
           </Suspense>
         ) : (
           <div className="center-state"><BookOpen /><p>노트를 선택하세요.</p></div>
         )}
       </main>
-      {terminalOpen ? (
-        <Suspense fallback={<aside className="inspector terminal-panel"><div className="center-state"><LoaderCircle className="spin" /></div></aside>}>
-          <TerminalPanel onClose={() => setTerminalOpen(false)} />
-        </Suspense>
-      ) : (
+      <div className="inspect-column" ref={inspectColumnRef}>
         <Inspector vault={vault} headings={headings} activeHeading={activeHeading} onJumpToHeading={(line) => scrollToHeadingRef.current?.(line)} />
-      )}
+        {terminalOpen ? (
+          <>
+            <div
+              className="terminal-resizer"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="터미널 높이 조절"
+              title="끌어서 터미널 높이 조절, 더블클릭으로 기본 높이"
+              onPointerDown={startTerminalResize}
+              onDoubleClick={() => setTerminalHeight(TERMINAL_HEIGHT_RANGE.default)}
+            />
+            <Suspense fallback={<aside className="inspector terminal-panel" style={{ height: terminalHeight }}><div className="center-state"><LoaderCircle className="spin" /></div></aside>}>
+              <TerminalPanel height={terminalHeight} onClose={() => setTerminalOpen(false)} />
+            </Suspense>
+          </>
+        ) : null}
+      </div>
 
       {publishTarget ? <BlogPublishDialog
         key={`${publishTarget.kind}:${publishTarget.path}`}
@@ -261,21 +276,10 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         <SettingsPanel
           appearance={appearance}
           onAppearanceChange={setAppearance}
-          ollama={ollama}
-          onOllamaUpdated={setOllama}
           initialTab={settingsTab}
           onClose={closeSettings}
         />
       ) : null}
-      <AssistantPanel
-        open={assistantOpen}
-        settings={ollama}
-        noteTitle={vault.activeNote?.title}
-        noteContent={vault.editorValue}
-        onOpenSettings={() => openSettings('ollama')}
-        onInsertToNote={insertAssistantText}
-        onClose={() => setAssistantOpen(false)}
-      />
       {switcherOpen ? (
         <VaultSwitcher
           currentKind={vault.repository.kind}
