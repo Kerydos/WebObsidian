@@ -1,4 +1,4 @@
-import { BookOpen, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles, SquareTerminal } from 'lucide-react';
+import { BookOpen, Check, CircleAlert, HardDrive, LoaderCircle, LogOut, Menu, PencilLine, Send, Settings2, Sparkles, SpellCheck, SquareTerminal } from 'lucide-react';
 import type { SaveState } from '../../hooks/useVault';
 
 interface TopbarProps {
@@ -13,12 +13,14 @@ interface TopbarProps {
   editing: boolean;
   onToggleEditing: () => void;
   onPublish?: () => void;
+  onSpellcheck?: () => void;
+  spellchecking?: boolean;
   publishLabel: string;
   menuOpen: boolean;
   onToggleMenu: () => void;
 }
 
-export function Topbar({ repositoryName, saveState, terminalOpen, onToggleTerminal, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
+export function Topbar({ repositoryName, saveState, terminalOpen, onToggleTerminal, onOpenSettings, onOpenVaultSwitcher, onLogout, activePath, editing, onToggleEditing, onPublish, onSpellcheck, spellchecking, publishLabel, menuOpen, onToggleMenu }: TopbarProps) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -45,6 +47,7 @@ export function Topbar({ repositoryName, saveState, terminalOpen, onToggleTermin
         {activePath ? <button className="logout-button" onClick={onToggleEditing} title={editing ? '읽기 모드로 전환' : '편집 모드로 전환'}>
           {editing ? <><BookOpen size={15} /><span className="btn-label">읽기</span></> : <><PencilLine size={15} /><span className="btn-label">편집</span></>}
         </button> : null}
+        {onSpellcheck ? <button className="logout-button" onClick={onSpellcheck} disabled={spellchecking} title="맞춤법·문법·띄어쓰기 검사 (영어·한국어)">{spellchecking ? <LoaderCircle size={15} className="spin" /> : <SpellCheck size={15} />}<span className="btn-label">검사</span></button> : null}
         {onPublish ? <button className="logout-button" onClick={onPublish} title={`선택한 ${publishLabel}`}><Send size={15} /><span className="btn-label">{publishLabel}</span></button> : null}
         <button
           className={terminalOpen ? 'topbar-button active' : 'topbar-button'}

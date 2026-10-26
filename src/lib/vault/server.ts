@@ -3,7 +3,7 @@ import { normalizeVaultPath } from './path';
 
 type ErrorResponse = { error?: string };
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
     if (response.status === 401) window.dispatchEvent(new Event('webobsidian:unauthorized'));

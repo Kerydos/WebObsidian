@@ -325,7 +325,7 @@ button { color: inherit; }
 
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; transform: translateX(-50%); max-width: min(520px, calc(100vw - 40px)); display: flex; align-items: center; gap: 9px; padding: 10px 12px; background: #2d2925; color: white; border-radius: 8px; box-shadow: 0 12px 40px rgba(30,25,20,.25); font-size: 12px; }
 .toast svg { flex: none; color: #e99a7d; }
-.toast button { margin-left: 5px; border: 0; background: transparent; color: #d7cfc5; cursor: pointer; font-size: 11px; }
+.toast button { flex: none; white-space: nowrap; margin-left: 5px; border: 0; background: transparent; color: #d7cfc5; cursor: pointer; font-size: 11px; }
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

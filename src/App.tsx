@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import { BookOpen, CircleAlert, LoaderCircle } from 'lucide-react';
+import { BookOpen, CircleAlert, FolderOpen, LoaderCircle, SpellCheck } from 'lucide-react';
 import { ServerVaultRepository } from './lib/vault/server';
 import { OpfsVaultRepository } from './lib/vault/opfs';
 import { LoginScreen } from './components/LoginScreen';
@@ -18,6 +18,9 @@ import { useAppearanceTheme } from './hooks/useAppearanceTheme';
 import { appearanceVariables } from './lib/settings/appearance';
 import { indexMarkdown } from './lib/markdown/indexer';
 import { isExcalidrawPath } from './lib/excalidraw';
+import { checkSpelling, toDiagnostics } from './lib/spellcheck';
+import { messageOf } from './lib/message';
+import type { Diagnostic } from '@codemirror/lint';
 
 const MarkdownEditor = lazy(() => import('./components/MarkdownEditor'));
 const ExcalidrawEditor = lazy(() => import('./components/ExcalidrawEditor'));
@@ -87,6 +90,11 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [publishTarget, setPublishTarget] = useState<{ kind: 'note' | 'folder'; path: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // 맞춤법 검사 결과는 검사한 그 텍스트일 때만 편집기에 넘긴다(편집 후 다시 마운트돼도 낡은 위치를 쓰지 않음).
+  const [spell, setSpell] = useState<{ path: string; text: string; diagnostics: Diagnostic[] } | null>(null);
+  const [spellchecking, setSpellchecking] = useState(false);
+  const [notice, setNotice] = useState<string>();
+  const noticeTimerRef = useRef<number | undefined>(undefined);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try { return clampSidebarWidth(Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))); }
     catch { return SIDEBAR_WIDTH_RANGE.default; }
@@ -172,6 +180,31 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSettingsOpen(true);
   }, []);
 
+  const showNotice = (message: string) => {
+    setNotice(message);
+    window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setNotice(undefined), 6000);
+  };
+
+  // 검사 결과의 제안은 밑줄 툴팁에서 바로 적용하므로 편집 모드로 바꾼 뒤 검사한다.
+  const runSpellcheck = async () => {
+    const path = vault.activePath;
+    if (!path) return;
+    const text = vault.editorValueRef.current;
+    vault.setEditingPath(path);
+    setSpellchecking(true);
+    try {
+      const result = await checkSpelling(text);
+      setSpell({ path, text, diagnostics: toDiagnostics(result.matches) });
+      const summary = result.matches.length ? `고칠 곳 ${result.matches.length}개를 밑줄로 표시했습니다. 밑줄에 마우스를 올리면 제안이 보입니다.` : '고칠 곳을 찾지 못했습니다.';
+      showNotice([summary, ...result.warnings].join(' '));
+    } catch (cause) {
+      vault.setError(messageOf(cause));
+    } finally {
+      setSpellchecking(false);
+    }
+  };
+
   const closeSwitcher = useCallback(() => setSwitcherOpen(false), []);
   const { setCreateTarget } = vault;
   const closeCreateDialog = useCallback(() => setCreateTarget(null), [setCreateTarget]);
@@ -211,6 +244,8 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         activePath={vault.activePath}
         editing={vault.editing}
         onToggleEditing={() => vault.setEditingPath(vault.editing ? undefined : vault.activePath)}
+        onSpellcheck={vault.activePath && !isExcalidrawPath(vault.activePath) ? () => void runSpellcheck() : undefined}
+        spellchecking={spellchecking}
         onPublish={vault.activePath || vault.selectedFolder ? () => setPublishTarget(vault.selectedFolder ? { kind: 'folder', path: vault.selectedFolder } : { kind: 'note', path: vault.activePath! }) : undefined}
         publishLabel={vault.selectedFolder ? '폴더 발행' : '글 발행'}
         menuOpen={menuOpen}
@@ -235,6 +270,7 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               readOnly={!vault.editing}
               onChange={vault.setEditorValue}
               onNavigateWikiLink={vault.navigateLink}
+              diagnostics={spell?.path === vault.activePath && spell.text === vault.editorValue ? spell.diagnostics : undefined}
               onReady={(scrollToLine) => { scrollToHeadingRef.current = scrollToLine; }}
               onScrollLine={(line) => setReaderPosition((current) => current?.path === vault.activePath && current?.line === line ? current : { path: vault.activePath!, line })}
             />}
@@ -272,6 +308,17 @@ function WorkspaceApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         onOpenSettings={() => { setPublishTarget(null); openSettings('blog'); }}
       /> : null}
 
+      {notice && !vault.error ? (
+        <div className="toast" role="status"><SpellCheck size={17} /><span>{notice}</span><button onClick={() => setNotice(undefined)}>닫기</button></div>
+      ) : null}
+      {vault.pendingLocalFolder && !vault.error ? (
+        <div className="toast" role="status">
+          <FolderOpen size={17} />
+          <span>지난번에 연 로컬 폴더 '{vault.pendingLocalFolder.name}'을(를) 다시 열까요?</span>
+          <button onClick={() => void vault.reconnectLocalFolder()}>다시 열기</button>
+          <button onClick={vault.forgetLocalFolder}>서버 볼트 유지</button>
+        </div>
+      ) : null}
       {vault.error ? (
         <div className="toast" role="alert"><CircleAlert size={17} /><span>{vault.error}</span><button onClick={() => vault.setError(undefined)}>닫기</button></div>
       ) : null}

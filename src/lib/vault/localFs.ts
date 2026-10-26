@@ -42,7 +42,7 @@ export class LocalFsVaultRepository implements VaultRepository {
   readonly kind = 'local' as const;
   readonly name: string;
 
-  constructor(private readonly root: FileSystemDirectoryHandle) {
+  constructor(readonly root: FileSystemDirectoryHandle) {
     this.name = root.name;
   }
 

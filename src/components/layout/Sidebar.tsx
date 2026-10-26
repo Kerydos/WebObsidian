@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { ChevronDown, ChevronRight, FilePlus2, PenTool, Folder, FolderOpen, FolderPlus, Search, Trash2 } from 'lucide-react';
 import { buildVaultTree, type NoteSortOrder } from '../../lib/vault/tree';
@@ -13,10 +13,19 @@ interface SidebarProps {
 }
 
 const NOTE_SORT_STORAGE_KEY = 'webobsidian:notesort:v1';
+const COLLAPSED_FOLDERS_STORAGE_KEY = 'webobsidian:collapsedfolders:v1';
 const NOTE_SORT_LABELS: Record<NoteSortOrder, string> = { created: '생성순', modified: '편집순', name: '이름순' };
 
 export function Sidebar({ vault, menuOpen, onCloseMenu, onResize, onResetWidth }: SidebarProps) {
-  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
+  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => {
+    try {
+      const stored: unknown = JSON.parse(window.localStorage.getItem(COLLAPSED_FOLDERS_STORAGE_KEY) ?? '[]');
+      return new Set(Array.isArray(stored) ? stored.filter((path): path is string => typeof path === 'string') : []);
+    } catch { return new Set(); }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(COLLAPSED_FOLDERS_STORAGE_KEY, JSON.stringify([...collapsedFolders])); } catch { /* Session-only setting. */ }
+  }, [collapsedFolders]);
   const [noteSort, setNoteSort] = useState<NoteSortOrder>(() => {
     try {
       const stored = window.localStorage.getItem(NOTE_SORT_STORAGE_KEY);

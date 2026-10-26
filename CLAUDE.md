@@ -45,6 +45,7 @@
 - `src/components/editor/markdownExtensions.ts`: 형광펜(`==하이라이트==`) `@lezer/markdown` 확장, 목록 Tab 들여쓰기 키맵, `::` 시각 삽입 스니펫
 - `src/components/editor/livePreview.test.ts`: 라이브 프리뷰 단위 테스트(`happy-dom` 환경에서 위젯 DOM까지 검증)
 - `src/components/ExcalidrawEditor.tsx` · `src/lib/excalidraw.ts`: Excalidraw 그림 편집기와 `*.excalidraw.md` 파싱·직렬화
+- `server/spellcheck.mjs` · `src/lib/spellcheck.ts`: 맞춤법 검사 서버(LanguageTool + 바른)와 CodeMirror 진단 변환
 - `src/components/TerminalPanel.tsx`: 오른쪽 열에 표시되는 xterm.js 웹 터미널(상단 터미널 버튼으로 토글)
 - `terminal-host/server.mjs`: **호스트에서** 실행되는 웹 터미널 PTY 데몬(node-pty + ws, 유닉스 소켓). Docker 이미지에 포함되지 않는다
 - `terminal-host/webobsidian-terminal.service`: 위 데몬의 systemd user 유닛 파일
@@ -99,6 +100,8 @@ docker compose up -d --build
 - `WEBOBSIDIAN_SECURE_COOKIE`: `true`이면 세션 쿠키에 `Secure` 적용
 - `WEBOBSIDIAN_VAULT_DIR`: 마크다운 파일 저장 폴더
 - `WEBOBSIDIAN_DIST_DIR`: 프론트엔드 빌드 결과 폴더
+- `WEBOBSIDIAN_LANGUAGETOOL_URL`: 선택. LanguageTool 서버 주소(Compose 기본 `http://webobsidian-languagetool:8010`). 비어 있으면 영어 검사를 건너뛴다
+- `WEBOBSIDIAN_BAREUN_HOST`: 선택. 바른 API 주소(기본 `https://api.bareun.ai`)
 - `WEBOBSIDIAN_TERMINAL_SOCKET`: 선택. 웹 터미널 호스트 데몬의 유닉스 소켓 경로. 비어 있으면 터미널 기능이 꺼지고 `/api/terminal`은 503을 돌려준다
 - `HOST`: 서버 바인딩 주소
 - `PORT`: 서버 포트
@@ -181,7 +184,7 @@ docker compose up -d --build
 
 ## 설정 창
 
-상단 톱니바퀴 버튼에서 설정 창을 열 수 있다. 설정 창은 '화면'과 '블로그' 두 개 탭으로 구성된다(`src/components/SettingsPanel.tsx`). 화면 설정은 브라우저의 `localStorage`에, 블로그 발행 API 키는 서버(vault 안의 `.webobsidian-blog.json`)에 저장된다. 과거의 AI 도우미(Ollama Cloud) 기능은 2026-10-26 사용자 요청으로 제거했다.
+상단 톱니바퀴 버튼에서 설정 창을 열 수 있다. 설정 창은 '화면', '블로그', '맞춤법' 세 개 탭으로 구성된다(`src/components/SettingsPanel.tsx`). 화면 설정은 브라우저의 `localStorage`에, 블로그 발행 API 키는 서버(vault 안의 `.webobsidian-blog.json`)에 저장된다. 과거의 AI 도우미(Ollama Cloud) 기능은 2026-10-26 사용자 요청으로 제거했다.
 
 ### 화면 탭
 
@@ -204,6 +207,16 @@ docker compose up -d --build
 - 장면은 삭제되지 않은 요소, 참조 중인 이미지 파일(dataURL), `viewBackgroundColor`/`gridSize`만 저장한다(확대·스크롤은 저장하지 않아 이동만으로는 저장이 일어나지 않음). 변경은 400ms 모아서 기존 자동 저장 흐름으로 넘긴다.
 - 이름 변경 입력란은 `.excalidraw`를 숨기고 커밋 시 다시 붙인다. 인덱서는 그림 파일의 제목·헤딩·링크를 뽑지 않는다.
 - 제한: Obsidian의 압축 형식(```compressed-json)은 읽지 못한다(Obsidian에서 'Decompress current Excalidraw file' 후 사용). Excalidraw 손글씨 폰트는 번들하지 않아 기본 CDN에서 받는다. 열려 있는 그림의 원격 변경은 다시 열어야 반영된다.
+
+## 맞춤법·문법·띄어쓰기 검사
+
+상단 바의 '검사' 버튼(마크다운 노트에서만 보임)을 누르면 편집 모드로 바뀌고 현재 노트 전체를 검사한다. 고칠 곳은 CodeMirror lint 밑줄(`@codemirror/lint`의 `setDiagnostics`)로 표시되고, 밑줄에 마우스를 올리면 설명과 제안 버튼이 나온다. 제안을 누르면 그 자리만 바뀌고 해당 밑줄이 사라진다(일반 자동 저장 흐름).
+
+- 엔진: 영어는 같은 Compose의 `languagetool` 컨테이너(`erikvl87/languagetool:6.8`, 외부 비공개, `WEBOBSIDIAN_LANGUAGETOOL_URL`), 한국어는 바른(Bareun) 호스팅 API(`POST https://api.bareun.ai/bareun.RevisionService/CorrectError`, Connect RPC JSON, `api-key` 헤더, `encodingType: UTF16`). 바른 API 키는 설정 > 맞춤법 탭에서 입력하며 vault 안의 `.webobsidian-bareun.json`(0600)에 저장된다(블로그 키와 같은 `BlogSettingsStore` 재사용). `WEBOBSIDIAN_BAREUN_HOST`로 자체 설치 서버를 가리킬 수 있다.
+- 부산대 맞춤법 검사기는 nara-speller.co.kr로 옮겨 가며 Cloudflare 봇 차단이 걸려 있어 쓰지 않는다(2026-10-26 확인).
+- 서버(`server/spellcheck.mjs`)는 마크다운에서 산문만 뽑아(`extractProse`: 코드·URL·HTML·프론트매터는 HARD, 마크업 기호는 SOFT로 제거) 두 엔진에 동시에 보내고, 결과를 원문 좌표로 되돌린다. HARD 영역에 걸친 제안은 버린다(단어가 붙어 생긴 가짜 오류). LanguageTool 결과 중 한국어가 섞인 문장은 건너뛴다. 한쪽 엔진이 실패하거나 키가 없으면 경고 문구만 토스트에 덧붙인다. 바른 오류 메시지에 담긴 키 원문은 가린다.
+- 편집기는 `linter(null)`로 lint 상태를 기본 구성에 둔다. `@uiw/react-codemirror`가 다시 렌더링될 때마다 재구성하므로, `setDiagnostics`가 스스로 붙인 확장만으로는 밑줄이 바로 사라진다.
+- 검사 결과는 검사한 텍스트와 현재 텍스트가 같을 때만 편집기에 넘긴다(편집 후 다시 마운트되면 낡은 위치를 쓰지 않음).
 
 ## 웹 터미널
 
@@ -237,7 +250,7 @@ npm run lint
 npm run build
 ```
 
-마지막 확인 결과는 테스트 13개 파일, 총 92개 테스트 통과와 프로덕션 빌드 성공이다. 웹 터미널은 데몬·서버·클라이언트를 임시 소켓과 포트로 띄워 미인증 401, 로그인 후 PTY 출력, 작업 디렉터리, 리사이즈 반영을 실제 WebSocket 왕복으로 확인했다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
+마지막 확인 결과는 테스트 14개 파일, 총 98개 테스트 통과와 프로덕션 빌드 성공이다. 웹 터미널은 데몬·서버·클라이언트를 임시 소켓과 포트로 띄워 미인증 401, 로그인 후 PTY 출력, 작업 디렉터리, 리사이즈 반영을 실제 WebSocket 왕복으로 확인했다. (이 서버에서 vitest 기본 forks 풀가 때때로 멈출 수 있다. 그때는 `npx vitest run --pool=threads`로 실행한다.) 빌드 시 `MarkdownEditor` 청크가 500 kB를 넘는다는 경고가 있지만 실패는 아니다. `src/components/editor/livePreview.test.ts`는 파일 상단의 `// @vitest-environment happy-dom` 지시어로 이 파일만 DOM 환경에서 실행되며(다른 테스트는 기본 node 환경 유지), 위젯이 실제로 생성하는 DOM까지 검증한다. 서버 환경(KERYON)에서 Docker 컨테이너를 재빌드·재배포한 뒤 `https://writer.kerydos.com`에 실제 로그인해 브라우저에서 기능을 직접 확인하는 방식으로도 검증했다.
 
 ## 알려진 제한사항
 
@@ -248,7 +261,7 @@ npm run build
 - 표 셀 안의 인라인 마크다운은 별도 파서로 다시 렌더링한 정적 HTML이라 셀 내부를 직접 클릭 편집할 수 없다. 전체 위젯을 클릭하면 원문 편집 모드로 전환된다.
 - 코드 블록은 언어 이름만 표시하고 언어별 구문 강조는 제공하지 않는다.
 - 서버 Vault API는 `.md`만 제공하므로 Vault 내부 이미지 첨부 파일을 별도로 서비스하지 않는다. 상대 이미지 경로와 Obsidian 임베드는 첨부 파일 제공 기능 없이는 정상 표시되지 않을 수 있다.
-- 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 상단 바의 vault pill 클릭으로 서버·로컬 폴더·브라우저(OPFS) 저장소를 전환할 수 있다.
+- 브라우저 로컬 폴더로 전환하는 기존 기능은 남아 있지만 기본 저장소는 서버다. 상단 바의 vault pill 클릭으로 서버·로컬 폴더·브라우저(OPFS) 저장소를 전환할 수 있다. 마지막으로 고른 볼트는 IndexedDB(`settings` 테이블의 `lastVault`, 로컬 폴더는 디렉터리 핸들까지)에 기억해 다음 접속 때 그대로 연다. 로컬 폴더 권한이 'granted'가 아니면(브라우저가 '방문할 때마다 허용'을 기억하지 않은 경우) 서버 볼트를 띄운 채 '다시 열기 / 서버 볼트 유지' 토스트를 보여 준다(권한 요청에는 사용자 클릭이 필요). 볼트별 마지막으로 연 노트는 `webobsidian:lastnote:v1:<kind>:<name>`, 사이드바 폴더 접힘 상태는 `webobsidian:collapsedfolders:v1` localStorage에 저장한다.
 
 ## 변경 시 주의사항
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VaultDocument, VaultEntry, VaultFolderEntry, VaultRepository } from '../types/vault';
 import { ServerVaultRepository } from '../lib/vault/server';
 import { LocalFsVaultRepository } from '../lib/vault/localFs';
+import { OpfsVaultRepository } from '../lib/vault/opfs';
 import { ensureMarkdownPath, fileName, linkTargetPath, normalizeVaultPath } from '../lib/vault/path';
 import { dailyNoteBaseName, uniqueBaseName } from '../lib/vault/names';
 import { backlinksFor, indexMarkdown, resolveLink } from '../lib/markdown/indexer';
@@ -15,6 +16,15 @@ export type SaveState = 'saved' | 'saving' | 'dirty' | 'error';
 export type NoteKind = 'note' | 'drawing';
 
 export type RenameTarget = { kind: 'note'; path: string } | { kind: 'folder'; path: string };
+
+// 마지막으로 연 볼트(로컬 폴더는 디렉터리 핸들까지)는 IndexedDB에, 볼트별 마지막 노트는 localStorage에 둔다.
+type RememberedVault = { kind: 'server' | 'opfs' } | { kind: 'local'; handle: FileSystemDirectoryHandle };
+const LAST_VAULT_KEY = 'lastVault';
+const lastNoteKey = (repository: VaultRepository) => `webobsidian:lastnote:v1:${repository.kind}:${repository.name}`;
+
+function readLastNote(repository: VaultRepository) {
+  try { return window.localStorage.getItem(lastNoteKey(repository)) ?? undefined; } catch { return undefined; }
+}
 
 function parentOf(path: string) {
   const separator = path.lastIndexOf('/');
@@ -42,6 +52,7 @@ export function useVault() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createTarget, setCreateTarget] = useState<NoteKind | null>(null);
+  const [pendingLocalFolder, setPendingLocalFolder] = useState<FileSystemDirectoryHandle | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<string | null>(null);
   const cancelRenameRef = useRef(false);
   const activePathRef = useRef(activePath);
@@ -75,7 +86,7 @@ export function useVault() {
 
   const loadRepository = useCallback(async (
     nextRepository: VaultRepository,
-    options: { preferredActivePath?: string; silent?: boolean } = {},
+    options: { preferredActivePath?: string; silent?: boolean; remember?: boolean } = {},
   ) => {
     if (!options.silent) setLoading(true);
     setError(undefined);
@@ -95,13 +106,20 @@ export function useVault() {
           })),
         );
       });
+      // 사용자가 고른 볼트만 기억한다(조용한 재조회나 임시 대체 로드는 기억을 덮지 않음).
+      if (!options.silent && options.remember !== false) {
+        const remembered: RememberedVault = nextRepository instanceof LocalFsVaultRepository
+          ? { kind: 'local', handle: nextRepository.root }
+          : { kind: nextRepository.kind === 'opfs' ? 'opfs' : 'server' };
+        await db.settings.put({ key: LAST_VAULT_KEY, value: remembered }).catch(() => undefined);
+        setPendingLocalFolder(null);
+      }
       setRepository(nextRepository);
       setEntries(nextEntries);
       setFolders(nextFolders);
       setDocuments(nextDocuments);
-      const activePathCandidate = options.preferredActivePath && nextDocuments.has(options.preferredActivePath)
-        ? options.preferredActivePath
-        : nextEntries[0]?.path;
+      const preferred = options.preferredActivePath ?? readLastNote(nextRepository);
+      const activePathCandidate = preferred && nextDocuments.has(preferred) ? preferred : nextEntries[0]?.path;
       setActivePath(activePathCandidate);
       setEditorValue(activePathCandidate ? nextDocuments.get(activePathCandidate)?.content ?? '' : '');
       setSaveState('saved');
@@ -115,8 +133,18 @@ export function useVault() {
   // 볼트 목록 로드는 화면이 뜨자마자 시작해야 하며, 로딩 표시를 위해 동기적으로 상태를 켠다.
   useEffect(() => {
     void navigator.storage.persist?.();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadRepository(repository);
+    void (async () => {
+      const remembered = (await db.settings.get(LAST_VAULT_KEY).catch(() => undefined))?.value as RememberedVault | undefined;
+      if (remembered?.kind === 'opfs') return loadRepository(new OpfsVaultRepository());
+      if (remembered?.kind === 'local') {
+        const permission = await remembered.handle?.queryPermission?.({ mode: 'readwrite' }).catch(() => undefined);
+        if (permission === 'granted') return loadRepository(new LocalFsVaultRepository(remembered.handle));
+        // 권한을 다시 받으려면 사용자 클릭이 필요하다. 그동안 서버 볼트를 보여 주되 기억은 유지한다.
+        setPendingLocalFolder(remembered.handle);
+        return loadRepository(repository, { remember: false });
+      }
+      return loadRepository(repository);
+    })();
     // The initial repository is intentionally loaded once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadRepository]);
@@ -251,6 +279,30 @@ export function useVault() {
     if (activePathRef.current === path) setActivePath(newPath);
     setEditingPath((current) => current === path ? newPath : current);
   }, [repository]);
+
+  useEffect(() => {
+    if (!activePath) return;
+    try { window.localStorage.setItem(lastNoteKey(repository), activePath); } catch { /* Session-only setting. */ }
+  }, [activePath, repository]);
+
+  const reconnectLocalFolder = async () => {
+    const handle = pendingLocalFolder;
+    setPendingLocalFolder(null);
+    if (!handle) return;
+    try {
+      if (await handle.requestPermission?.({ mode: 'readwrite' }) !== 'granted') throw new Error('로컬 폴더 접근 권한이 거부되었습니다.');
+      await saveActive();
+      await loadRepository(new LocalFsVaultRepository(handle));
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+
+  // 다시 열지 않기로 하면 서버 볼트를 기억해 다음 접속 때 묻지 않는다.
+  const forgetLocalFolder = () => {
+    setPendingLocalFolder(null);
+    void db.settings.put({ key: LAST_VAULT_KEY, value: { kind: repository.kind === 'opfs' ? 'opfs' : 'server' } }).catch(() => undefined);
+  };
 
   const openLocalFolder = async () => {
     if (!window.showDirectoryPicker) {
@@ -534,6 +586,9 @@ export function useVault() {
     handleNoteDelete,
     handleNoteMove,
     openLocalFolder,
+    pendingLocalFolder,
+    reconnectLocalFolder,
+    forgetLocalFolder,
     renaming,
     renameValue,
     setRenameValue,

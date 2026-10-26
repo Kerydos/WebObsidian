@@ -9,6 +9,7 @@ import { AuthError, AuthManager, expiredSessionCookie, readSessionToken, session
 import { FileVault, VaultError } from './vault.mjs';
 import { VaultWatcher } from './watcher.mjs';
 import { BlogError, BlogSettingsStore, listBlogFolders, publishBlog } from './blog.mjs';
+import { checkMarkdown, SpellcheckError } from './spellcheck.mjs';
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const publicRoot = resolve(process.env.WEBOBSIDIAN_DIST_DIR ?? resolve(projectRoot, 'dist'));
@@ -102,6 +103,8 @@ const watcher = new VaultWatcher(vaultRoot, vault.changes);
 watcher.start();
 
 const blogSettings = new BlogSettingsStore(resolve(vaultRoot, '.webobsidian-blog.json'));
+// 바른(Bareun) 맞춤법 API 키. 형식이 같아 블로그 키 저장소를 그대로 쓴다.
+const bareunSettings = new BlogSettingsStore(resolve(vaultRoot, '.webobsidian-bareun.json'));
 
 const server = createServer(async (request, response) => {
   try {
@@ -126,7 +129,7 @@ const server = createServer(async (request, response) => {
         'Set-Cookie': expiredSessionCookie({ secure: secureCookie }),
       });
     }
-    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/blog/')) && !auth.isAuthenticated(sessionToken)) {
+    if ((url.pathname.startsWith('/api/vault') || url.pathname.startsWith('/api/blog/') || url.pathname.startsWith('/api/spellcheck')) && !auth.isAuthenticated(sessionToken)) {
       return sendJson(response, 401, { error: '로그인이 필요합니다.' });
     }
     if (url.pathname === '/api/blog/settings') {
@@ -136,6 +139,22 @@ const server = createServer(async (request, response) => {
         await blogSettings.write(body.apiKey);
         return sendJson(response, 200, { hasApiKey: !!(await blogSettings.read()) });
       }
+    }
+    if (url.pathname === '/api/spellcheck/settings') {
+      if (request.method === 'GET') return sendJson(response, 200, { hasApiKey: !!(await bareunSettings.read()) });
+      if (request.method === 'PUT') {
+        const body = await readJson(request);
+        await bareunSettings.write(body.apiKey);
+        return sendJson(response, 200, { hasApiKey: !!(await bareunSettings.read()) });
+      }
+    }
+    if (request.method === 'POST' && url.pathname === '/api/spellcheck') {
+      const body = await readJson(request);
+      return sendJson(response, 200, await checkMarkdown(body.text, {
+        languageToolUrl: process.env.WEBOBSIDIAN_LANGUAGETOOL_URL,
+        bareunApiKey: await bareunSettings.read(),
+        bareunHost: process.env.WEBOBSIDIAN_BAREUN_HOST,
+      }));
     }
     if (request.method === 'GET' && url.pathname === '/api/blog/folders') {
       return sendJson(response, 200, { folders: await listBlogFolders(process.env.WEBOBSIDIAN_BLOG_VAULT_DIR ?? resolve(projectRoot, '../blog_with_obsidian_style/vault')) });
@@ -205,7 +224,7 @@ const server = createServer(async (request, response) => {
     if (url.pathname.startsWith('/api/')) return sendJson(response, 404, { error: 'API를 찾을 수 없습니다.' });
     await serveStatic(request, response, url.pathname);
   } catch (error) {
-    const status = error instanceof VaultError || error instanceof AuthError || error instanceof BlogError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
+    const status = error instanceof VaultError || error instanceof AuthError || error instanceof BlogError || error instanceof SpellcheckError ? error.status : error?.code === 'ENOENT' ? 503 : 500;
     if (status === 500) console.error(error);
     sendJson(response, status, { error: status === 500 ? '서버 오류가 발생했습니다.' : error.message });
   }

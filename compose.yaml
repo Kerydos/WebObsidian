@@ -9,11 +9,23 @@ services:
       WEBOBSIDIAN_MIN_PASSWORD_LENGTH: "8"
       WEBOBSIDIAN_BLOG_VAULT_DIR: /data/blog-vault
       WEBOBSIDIAN_TERMINAL_SOCKET: /run/webobsidian-terminal/terminal.sock
+      WEBOBSIDIAN_LANGUAGETOOL_URL: http://webobsidian-languagetool:8010
     volumes:
       - ${WEBOBSIDIAN_VAULT_HOST_DIR:-${HOME}/Documents/SecondBrain}:/data/vault
       - ${BLOG_VAULT_DIR:-../blog_with_obsidian_style/vault}:/data/blog-vault:ro
       # 호스트 terminal-host 데몬의 소켓 디렉터리(소켓 파일이 재생성돼도 마운트가 유지되도록 디렉터리 단위로 연결)
       - ${HOME}/.local/state/webobsidian:/run/webobsidian-terminal
+    networks:
+      - gototop-net
+
+  # 영어 맞춤법·문법 검사기. 외부에 공개하지 않고 같은 네트워크의 webobsidian만 접근한다.
+  languagetool:
+    image: erikvl87/languagetool:6.8
+    container_name: webobsidian-languagetool
+    restart: unless-stopped
+    environment:
+      Java_Xms: 256m
+      Java_Xmx: 1g
     networks:
       - gototop-net
 

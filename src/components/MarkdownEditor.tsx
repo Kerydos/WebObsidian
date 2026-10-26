@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorView, keymap } from '@codemirror/view';
+import { linter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { livePreview } from './editor/livePreview';
 import { CjkEmphasis, Highlight, listIndentKeymap, timeSnippet } from './editor/markdownExtensions';
 
@@ -12,9 +13,11 @@ interface MarkdownEditorProps {
   onNavigateWikiLink?: (target: string) => void;
   onScrollLine?: (line: number) => void;
   onReady?: (scrollToLine: ((line: number) => void) | null) => void;
+  // 맞춤법 검사 결과. 이후 편집은 CodeMirror가 위치를 따라 옮긴다.
+  diagnostics?: Diagnostic[];
 }
 
-export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onScrollLine, onReady }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, readOnly = false, onChange, onNavigateWikiLink, onScrollLine, onReady, diagnostics }: MarkdownEditorProps) {
   const navigateRef = useRef(onNavigateWikiLink);
   // 콜백은 커밋 이후 에디터 이벤트에서만 호출되므로, 커밋 시점에 최신 값을 담는다.
   useEffect(() => {
@@ -36,6 +39,9 @@ export default function MarkdownEditor({ value, readOnly = false, onChange, onNa
       readyRef.current?.(null);
     };
   }, [view]);
+  useEffect(() => {
+    if (view && diagnostics) view.dispatch(setDiagnostics(view.state, diagnostics));
+  }, [view, diagnostics]);
   const extensions = useMemo(
     () => [
       markdown({ base: markdownLanguage, extensions: [Highlight, CjkEmphasis] }),
@@ -43,6 +49,8 @@ export default function MarkdownEditor({ value, readOnly = false, onChange, onNa
       // eslint-disable-next-line react-hooks/refs
       livePreview((target) => navigateRef.current?.(target)),
       keymap.of(listIndentKeymap),
+      // 검사 결과 상태를 기본 구성에 둔다. setDiagnostics가 스스로 붙이는 확장은 재구성 때 사라진다.
+      linter(null),
       timeSnippet,
       EditorView.lineWrapping,
       EditorView.theme({
