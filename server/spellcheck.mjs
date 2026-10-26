@@ -96,7 +96,8 @@ export function parseBareun(body) {
     if (!origin.content?.trim() || !replacements.length) return [];
     const first = revisions[0] ?? {};
     const category = BAREUN_CATEGORY[first.category] ?? '맞춤법';
-    const comment = body.helps?.[first.helpId]?.comment;
+    // 설명에는 <IN>…</IN> 같은 강조 태그가 섞여 온다.
+    const comment = body.helps?.[first.helpId]?.comment?.replace(/<\/?[A-Z]+>/g, '');
     const from = origin.beginOffset ?? 0;
     return [{ from, to: from + (origin.length ?? origin.content.length), message: comment ? `${category}: ${comment}` : category, replacements, source: 'Bareun' }];
   });

@@ -40,7 +40,7 @@ describe('spellcheck', () => {
         { origin: { content: '할수', beginOffset: 0, length: 2 }, revised: '할 수', revisions: [{ revised: '할 수', category: 'SPACING', helpId: 'h1' }] },
         { origin: { content: '있다', beginOffset: 3, length: 2 }, revised: '있다', revisions: [{ revised: '있다' }] },
       ],
-      helps: { h1: { comment: '의존 명사는 띄어 씁니다.' } },
+      helps: { h1: { comment: '<IN>의존 명사</IN>는 띄어 씁니다.' } },
     });
     expect(matches).toEqual([{ from: 0, to: 2, message: '띄어쓰기: 의존 명사는 띄어 씁니다.', replacements: ['할 수'], source: 'Bareun' }]);
   });
