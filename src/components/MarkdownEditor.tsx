@@ -53,6 +53,8 @@ export default function MarkdownEditor({ value, readOnly = false, onChange, onNa
       linter(null),
       timeSnippet,
       EditorView.lineWrapping,
+      // 브라우저·운영체제의 맞춤법 검사기로 오타에 밑줄을 긋는다(CodeMirror 기본값은 꺼짐). 편집 모드에서만 동작한다.
+      EditorView.contentAttributes.of({ spellcheck: 'true', autocorrect: 'off', autocapitalize: 'off' }),
       EditorView.theme({
         '&': { height: '100%', backgroundColor: 'transparent' },
         '.cm-scroller': {

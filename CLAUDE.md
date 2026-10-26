@@ -217,6 +217,7 @@ docker compose up -d --build
 - 서버(`server/spellcheck.mjs`)는 마크다운에서 산문만 뽑아(`extractProse`: 코드·URL·HTML·프론트매터는 HARD, 마크업 기호는 SOFT로 제거) 두 엔진에 동시에 보내고, 결과를 원문 좌표로 되돌린다. HARD 영역에 걸친 제안은 버린다(단어가 붙어 생긴 가짜 오류). LanguageTool 결과 중 한국어가 섞인 문장은 건너뛴다. 한쪽 엔진이 실패하거나 키가 없으면 경고 문구만 토스트에 덧붙인다. 바른 오류 메시지에 담긴 키 원문은 가린다.
 - 편집기는 `linter(null)`로 lint 상태를 기본 구성에 둔다. `@uiw/react-codemirror`가 다시 렌더링될 때마다 재구성하므로, `setDiagnostics`가 스스로 붙인 확장만으로는 밑줄이 바로 사라진다.
 - 검사 결과는 검사한 텍스트와 현재 텍스트가 같을 때만 편집기에 넘긴다(편집 후 다시 마운트되면 낡은 위치를 쓰지 않음).
+- 이와 별개로 편집기 본문에 `spellcheck="true"`(`EditorView.contentAttributes`)를 켜 두어, 편집 모드에서는 브라우저·운영체제의 맞춤법 검사기가 입력하는 대로 오타에 빨간 밑줄을 긋는다(Chrome 설정의 맞춤법 검사 언어에 한국어가 있어야 함). 읽기 모드(contenteditable=false)에서는 브라우저가 검사하지 않는다.
 
 ## 웹 터미널
 
